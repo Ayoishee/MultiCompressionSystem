@@ -2,7 +2,6 @@
 #include<stdlib.h>
 #include<string.h>
 
-
 #define MAX_FILENAME 256
 #define MAX_TEXT_SIZE 1000000
 #define MAX_TREE_NODES 512
@@ -57,6 +56,7 @@ FileType detectFileType(const char *fileName)
     {
         return BMP_FILE;
     }
+
     return UNKNOWN_FILE;
 }
 
@@ -320,6 +320,7 @@ void compressTextHuffman(const char * inputFile)
    fp= fopen(compressedFile,"wb");
 
     fwrite(&codeCount,sizeof(int),1,fp);
+
     for(int i=0;i<codeCount;i++){
         fwrite(&huffmanCodes[i].character,sizeof(unsigned char),1,fp);
         int codeLength=strlen(huffmanCodes[i].code);
@@ -354,7 +355,17 @@ void compressTextHuffman(const char * inputFile)
     printf("File compressed successfully: %s\n",compressedFile);
     printf("Original Size: %ld bytes\n",fileSize);
 
-    int compressedBytes = compressedIndex/8 + (compressedIndex % 8 != 0 ? 1 : 0);
+    int fullBytes = compressedIndex / 8;
+    int leftoverBits = compressedIndex % 8;
+
+    int extraByte = 0;
+    if(leftoverBits != 0)
+              {
+               extraByte = 1;
+               }
+
+    int compressedBytes = fullBytes + extraByte;
+
     printf("Compressed Size: %d bytes\n", compressedBytes);
 
     double reduction = (1.0 - ((double)compressedBytes / (double)fileSize)) * 100.0;
@@ -427,10 +438,10 @@ void compressTextHuffman(const char * inputFile)
 
 }
 
-void compressBMPBitPlane(const char * inputFile)
+void compressBMPBitPlane(const char *inputFile)
 {
     printf("Detected: BMP ImageFile\n");
-    printf("BIT-PLANE CODING IS USED FOR COMPRESSION\n");
+    printf("Bit Plane Slicing is used for compression.\n");
     
     FILE *fp=fopen(inputFile,"rb");
     if(fp==NULL)
@@ -444,28 +455,46 @@ void compressBMPBitPlane(const char * inputFile)
     fread(&fileHeader,sizeof(BMPFileHeader),1,fp);
     fread(&infoHeader,sizeof(BMPInfoHeader),1,fp);  
 
-    if(infoHeader.biBitCount != 8)
+    if(fileHeader.bfType != 0x4D42)
     {
-        printf("Only 8-bit Grayscale BMP files are supported.\n");
+        printf("Not a BMP file.\n");
         fclose(fp);
         return;
     }
-    
-    int width=infoHeader.biWidth;
-    int height=infoHeader.biHeight;
-    int imageSize =width*height;
 
+    if(infoHeader.biBitCount != 8)
+    {
+        printf("Only 8-bit grayscale BMP images are supported\n");
+         printf("(Your image is %d-bit)\n", infoHeader.biBitCount);
+        fclose(fp);
+        return;
+    }
+
+    int width = infoHeader.biWidth;
+    int height = abs(infoHeader.biHeight);
+    int isBottomUp = (infoHeader.biHeight > 0);
+
+    int imageSize = width * height;
+
+    printf("Image info:\n");
+    printf(" Dimensions: %dx%d pixels\n", width, height);
+    printf(" Bit depth:  8-bit grayscale\n\n");
+    
     unsigned char palette[1024];
     fread(palette,1,1024,fp);
 
-    int padding=(4-(width%4))%4;
+    int remainder = width % 4;
+    int padding = 4 - remainder;
+    padding = padding % 4;
 
     unsigned char *imageData=(unsigned char*)malloc(imageSize);
-    for(int i=0;i<height;i++)
-    {
-        fread(imageData+i*width,1,width,fp);
-        fseek(fp,padding,SEEK_CUR);
-    }
+      for (int i = 0; i < height; i++)
+        {
+          int row = isBottomUp ? (height - 1 - i) : i;
+          fread(imageData + row * width, 1, width, fp);
+          fseek(fp, padding, SEEK_CUR);
+        }
+
     fclose(fp);
 
     unsigned char *bitPlanes[8];
@@ -484,6 +513,7 @@ void compressBMPBitPlane(const char * inputFile)
 
     char compressedFile[MAX_FILENAME];
     strcpy(compressedFile, inputFile);
+
     char *ext=strrchr(compressedFile,'.');
     if(ext)*ext='\0';
     strcat(compressedFile,"_compressed.bps");
@@ -493,7 +523,7 @@ void compressBMPBitPlane(const char * inputFile)
     fwrite(&width,sizeof(int),1,fp);
     fwrite(&height,sizeof(int),1,fp);
 
-    for(int plane=5;plane<8;plane++)
+    for(int plane=0;plane<8;plane++)
     {
         int packedSize=(imageSize+7)/8;
         unsigned char *packed=(unsigned char*)calloc(packedSize,1);
@@ -502,15 +532,27 @@ void compressBMPBitPlane(const char * inputFile)
         {
             if(bitPlanes[plane][i])
             {
-                packed[i/8]|=(1<<(7-(i%8)));
+                int byteIndex = i / 8;
+                int bitPosition = 7 - (i % 8);
+                unsigned char mask = 1 << bitPosition;
+                packed[byteIndex] |= mask;
             }
         }
         fwrite(packed,1,packedSize,fp);
         free(packed);
     }
   fclose(fp);
-  long originalSize = fileHeader.bfSize;
-    long compressedSize = sizeof(int) * 2 + ((imageSize + 7) / 8) * 3;
+   long originalSize = fileHeader.bfSize;
+   long widthSize = sizeof(int);
+   long heightSize = sizeof(int);
+
+   int bitsPerPlane = imageSize;
+   int bytesPerPlane = (bitsPerPlane + 7) / 8;
+   int numberOfPlanes = 8;
+   int planesSize = bytesPerPlane * numberOfPlanes;
+
+   long compressedSize = widthSize + heightSize + planesSize;
+
     
     printf("File compressed successfully: %s\n", compressedFile);
     printf("Original Size: %ld bytes\n", originalSize);
@@ -525,7 +567,7 @@ void compressBMPBitPlane(const char * inputFile)
     int readImageSize = readWidth * readHeight;
     unsigned char *reconstructed = (unsigned char*)calloc(readImageSize, 1);
     
-    for(int plane = 5; plane < 8; plane++)
+    for(int plane = 0; plane < 8; plane++)
     {
         int packedSize = (readImageSize + 7) / 8;
         unsigned char *packed = (unsigned char*)malloc(packedSize);
@@ -533,10 +575,14 @@ void compressBMPBitPlane(const char * inputFile)
         
         for(int i = 0; i < readImageSize; i++)
         {
-            if(packed[i / 8] & (1 << (i % 8)))
-            {
-                reconstructed[i] |= (1 << plane);
-            }
+            int byteIndex = i / 8;
+            int bitPosition = 7 - (i % 8);
+
+            if (packed[byteIndex] & (1 << bitPosition))
+               {
+                 reconstructed[i] |= (1 << plane);
+               }
+
         }
         
         free(packed);
@@ -549,17 +595,31 @@ void compressBMPBitPlane(const char * inputFile)
     if(ext) *ext = '\0';
     strcat(decompressedFile, "_decompressed.bmp");
 
+    infoHeader.biSizeImage = (width + padding) * height;
+    fileHeader.bfOffBits = sizeof(BMPFileHeader)
+                      + sizeof(BMPInfoHeader)
+                      + 1024;
+
+    fileHeader.bfSize = fileHeader.bfOffBits + infoHeader.biSizeImage;  
+
     fp = fopen(decompressedFile, "wb");
+
+    infoHeader.biHeight = isBottomUp ? height : -height;
+
     fwrite(&fileHeader, sizeof(BMPFileHeader), 1, fp);
     fwrite(&infoHeader, sizeof(BMPInfoHeader), 1, fp);
     fwrite(palette, 1, 1024, fp);
     
-    for(int i = 0; i < height; i++)
-    {
-        fwrite(reconstructed + i * width, 1, width, fp);
-        unsigned char pad[3] = {0};
-        fwrite(pad, 1, padding, fp);
-    }
+    unsigned char pad[3] = {0, 0, 0};
+
+    for (int i = 0; i < height; i++)
+{
+    int row = isBottomUp ? (height - 1 - i) : i;
+    fwrite(reconstructed + row * width, 1, width, fp);
+    fwrite(pad, 1, padding, fp);
+}
+
+
     fclose(fp);
     printf("File decompressed successfully: %s\n", decompressedFile);
 
