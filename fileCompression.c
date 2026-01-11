@@ -4,17 +4,46 @@
 
 
 #define MAX_FILENAME 256
-#define MAX_TEXT_SIZE 100000000000
+#define MAX_TEXT_SIZE 1000000
 #define MAX_TREE_NODES 512
 
 typedef enum{
     TEXT_FILE,
+    BMP_FILE,
     UNKNOWN_FILE
 }FileType;
-
-FileType detectFileType(const char* fileName)
+ 
+#pragma pack(push,1)
+typedef struct
 {
-    const char* dot=strrchr(fileName,'.');
+    unsigned short bfType;
+    unsigned int bfSize;
+    unsigned short bfReserved1;
+    unsigned short bfReserved2;
+    unsigned int bfOffBits;
+}BMPFileHeader;
+
+typedef struct
+{
+    unsigned int biSize;
+    int biWidth;
+    int biHeight;
+    unsigned short biPlanes;
+    unsigned short biBitCount;
+    unsigned int biCompression;
+    unsigned int biSizeImage;
+    int biXPelsPerMeter;
+    int biYPelsPerMeter;
+    unsigned int biClrUsed;
+    unsigned int biClrImportant;
+
+}BMPInfoHeader;
+
+#pragma pack(pop)
+
+FileType detectFileType(const char *fileName)
+{
+    const char *dot=strrchr(fileName,'.');
 
     if(!dot || dot==fileName) 
     {
@@ -24,6 +53,10 @@ FileType detectFileType(const char* fileName)
     {
         return TEXT_FILE;
     }
+    if(strcmp(dot,".bmp")==0)
+    {
+        return BMP_FILE;
+    }
     return UNKNOWN_FILE;
 }
 
@@ -31,9 +64,9 @@ typedef struct HuffmanNode{
 
     unsigned char data;
      int freq;
-     struct HuffmanNode *left,*right;
+     struct HuffmanNode *left,  *right;
 
-} HuffmanNode;
+}HuffmanNode;
 
 typedef struct{
   
@@ -45,14 +78,15 @@ typedef struct{
 
 typedef struct {
 
-HuffmanNode* nodes[MAX_TREE_NODES];
+     HuffmanNode *nodes[MAX_TREE_NODES];
      int size;
 
-} MinHeap;    
+}MinHeap;    
 
-HuffmanNode* createNode(unsigned data, int freq)
+HuffmanNode *createNode(unsigned data,int freq)
 {
-     HuffmanNode* newNode = (HuffmanNode*)malloc(sizeof(HuffmanNode));
+     HuffmanNode *newNode = (HuffmanNode*)malloc(sizeof(HuffmanNode));
+     
         if (!newNode) 
          {
            fprintf(stderr, "Memory allocation failed\n");
@@ -66,9 +100,9 @@ HuffmanNode* createNode(unsigned data, int freq)
      return newNode;
 }
 
-void swapNodes(HuffmanNode** a,HuffmanNode** b)
+void swapNodes(HuffmanNode **a,HuffmanNode **b)
 {
-    HuffmanNode* temp=*a;
+    HuffmanNode *temp= *a;
     *a=*b;
     *b=temp;
 }
@@ -104,7 +138,7 @@ HuffmanNode* extractMin(MinHeap *heap)
         return NULL;
     }
 
-    HuffmanNode* root = heap->nodes[0];
+    HuffmanNode *root = heap->nodes[0];
 
     heap->nodes[0] = heap->nodes[heap->size - 1];
     heap->size--;
@@ -139,6 +173,7 @@ void insertMinHeap(MinHeap *heap,HuffmanNode* node)
 
     heap->nodes[i] = node;
 }
+
 void buildHuffmanCodes(HuffmanNode* root, char* code, int top, HuffmanCode* huffmanCodes, int* index)
 {
     if(root->left==NULL && root->right==NULL)
@@ -162,7 +197,7 @@ void buildHuffmanCodes(HuffmanNode* root, char* code, int top, HuffmanCode* huff
     
 }
 
-HuffmanNode* buildHuffmanTree(unsigned char *text, int size,HuffmanCode* codes, int * codeCount)
+HuffmanNode* buildHuffmanTree(unsigned char *text, int size,HuffmanCode *codes, int *codeCount)
 {
      if (size == 0) 
     {
@@ -294,8 +329,8 @@ void compressTextHuffman(const char * inputFile)
 
     fwrite(&fileSize,sizeof(long),1,fp);
 
-    char* compressed=(char*)malloc(fileSize*256);
-    int compressedIndex=0;
+      char* compressed=(char*)malloc(fileSize*256);
+      int compressedIndex=0;
 
     for(int i=0; i<fileSize;i++)
     {
@@ -336,15 +371,19 @@ void compressTextHuffman(const char * inputFile)
     for(int i=0;i<readCodeCount;i++)
     {
         fread(&readCodes[i].character,sizeof(unsigned char),1,fp);
+
         int codeLength;
+
         fread(&codeLength,sizeof(int),1,fp);
         fread(readCodes[i].code,sizeof(char),codeLength,fp);
+
         readCodes[i].code[codeLength]='\0'; 
     }
         long originalSize;
         fread(&originalSize,sizeof(long),1,fp);
 
         int readCompressedLength;
+
         fread(&readCompressedLength,sizeof(int),1,fp);
         char* readCompressed=(char*)malloc(readCompressedLength);
         fread(readCompressed,sizeof(char),readCompressedLength,fp);
@@ -388,6 +427,150 @@ void compressTextHuffman(const char * inputFile)
 
 }
 
+void compressBMPBitPlane(const char * inputFile)
+{
+    printf("Detected: BMP ImageFile\n");
+    printf("BIT-PLANE CODING IS USED FOR COMPRESSION\n");
+    
+    FILE *fp=fopen(inputFile,"rb");
+    if(fp==NULL)
+    {
+        printf("Error opening file: %s\n",inputFile);
+        return; 
+    }
+    BMPFileHeader fileHeader;
+    BMPInfoHeader infoHeader;
+
+    fread(&fileHeader,sizeof(BMPFileHeader),1,fp);
+    fread(&infoHeader,sizeof(BMPInfoHeader),1,fp);  
+
+    if(infoHeader.biBitCount != 8)
+    {
+        printf("Only 8-bit Grayscale BMP files are supported.\n");
+        fclose(fp);
+        return;
+    }
+    
+    int width=infoHeader.biWidth;
+    int height=infoHeader.biHeight;
+    int imageSize =width*height;
+
+    unsigned char palette[1024];
+    fread(palette,1,1024,fp);
+
+    int padding=(4-(width%4))%4;
+
+    unsigned char *imageData=(unsigned char*)malloc(imageSize);
+    for(int i=0;i<height;i++)
+    {
+        fread(imageData+i*width,1,width,fp);
+        fseek(fp,padding,SEEK_CUR);
+    }
+    fclose(fp);
+
+    unsigned char *bitPlanes[8];
+    for(int plane = 0; plane < 8; plane++)
+    {
+        bitPlanes[plane] = (unsigned char*)calloc(imageSize, 1);
+    }
+
+    for(int i = 0; i < imageSize; i++)
+    {
+        for(int plane = 0; plane < 8; plane++)
+        {
+            bitPlanes[plane][i] = (imageData[i] >> plane) & 1;
+        }
+    }
+
+    char compressedFile[MAX_FILENAME];
+    strcpy(compressedFile, inputFile);
+    char *ext=strrchr(compressedFile,'.');
+    if(ext)*ext='\0';
+    strcat(compressedFile,"_compressed.bps");
+
+    fp=fopen(compressedFile,"wb");
+
+    fwrite(&width,sizeof(int),1,fp);
+    fwrite(&height,sizeof(int),1,fp);
+
+    for(int plane=5;plane<8;plane++)
+    {
+        int packedSize=(imageSize+7)/8;
+        unsigned char *packed=(unsigned char*)calloc(packedSize,1);
+
+        for(int i=0;i<imageSize;i++)
+        {
+            if(bitPlanes[plane][i])
+            {
+                packed[i/8]|=(1<<(7-(i%8)));
+            }
+        }
+        fwrite(packed,1,packedSize,fp);
+        free(packed);
+    }
+  fclose(fp);
+  long originalSize = fileHeader.bfSize;
+    long compressedSize = sizeof(int) * 2 + ((imageSize + 7) / 8) * 3;
+    
+    printf("File compressed successfully: %s\n", compressedFile);
+    printf("Original Size: %ld bytes\n", originalSize);
+    printf("Compressed Size: %ld bytes\n", compressedSize);
+    printf("Reduction: %.2f%%\n", (1.0 - ((double)compressedSize / originalSize)) * 100.0);
+
+    fp = fopen(compressedFile, "rb");
+    int readWidth, readHeight;
+    fread(&readWidth, sizeof(int), 1, fp);
+    fread(&readHeight, sizeof(int), 1, fp);
+    
+    int readImageSize = readWidth * readHeight;
+    unsigned char *reconstructed = (unsigned char*)calloc(readImageSize, 1);
+    
+    for(int plane = 5; plane < 8; plane++)
+    {
+        int packedSize = (readImageSize + 7) / 8;
+        unsigned char *packed = (unsigned char*)malloc(packedSize);
+        fread(packed, 1, packedSize, fp);
+        
+        for(int i = 0; i < readImageSize; i++)
+        {
+            if(packed[i / 8] & (1 << (i % 8)))
+            {
+                reconstructed[i] |= (1 << plane);
+            }
+        }
+        
+        free(packed);
+    }
+    fclose(fp);
+   
+    char decompressedFile[MAX_FILENAME];
+    strcpy(decompressedFile, inputFile);
+    ext = strrchr(decompressedFile, '.');
+    if(ext) *ext = '\0';
+    strcat(decompressedFile, "_decompressed.bmp");
+
+    fp = fopen(decompressedFile, "wb");
+    fwrite(&fileHeader, sizeof(BMPFileHeader), 1, fp);
+    fwrite(&infoHeader, sizeof(BMPInfoHeader), 1, fp);
+    fwrite(palette, 1, 1024, fp);
+    
+    for(int i = 0; i < height; i++)
+    {
+        fwrite(reconstructed + i * width, 1, width, fp);
+        unsigned char pad[3] = {0};
+        fwrite(pad, 1, padding, fp);
+    }
+    fclose(fp);
+    printf("File decompressed successfully: %s\n", decompressedFile);
+
+    free(imageData);
+    free(reconstructed);
+    for(int plane = 0; plane < 8; plane++)
+    {
+        free(bitPlanes[plane]);
+    }
+}
+
 void processFile(const char* fileName)
 {
     printf("File compression and decompression functionality is under development.\n");
@@ -401,6 +584,10 @@ void processFile(const char* fileName)
             printf("Processing text file: %s\n", fileName);
             compressTextHuffman(fileName);
             break;
+        case BMP_FILE:
+            printf("Processing BMP file: %s\n", fileName);
+            compressBMPBitPlane(fileName);
+            break;    
 
         default:
             printf("Unsupported file type for file: %s\n", fileName);
@@ -415,7 +602,7 @@ int main()
     printf("----------Multi-Formate Compression and decompression Tool----------\n");
     printf("Supported Formates:\n");
     printf("1. Text File Compression\n");
-    printf("2. Text File Decompression\n");
+    printf("2. BMP Image file Compression(Only Grayscale)\n");
     printf("Enter the filename: ");
 
     if(fgets(filename,sizeof(filename),stdin)!=NULL)
