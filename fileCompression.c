@@ -379,7 +379,9 @@ void compressTextHuffman(const char *inputFile)
 
     printf("Compressed Size: %d bytes\n", compressedBytes);
 
-    double reduction = (1.0 - ((double)compressedBytes / (double)fileSize)) * 100.0;
+    double fractionRemaining = (double)compressedBytes / (double)fileSize;
+    double reduction = (1.0 - fractionRemaining) * 100.0;
+
     printf("Reduction: %.2f%%\n", reduction);
 
 
@@ -486,14 +488,26 @@ void compressBMPBitPlaneMSB(const char *inputFile)
     if(infoHeader.biBitCount != 8)
     {
         printf("Only 8-bit grayscale BMP images are supported\n");
-         printf("(Your image is %d-bit)\n", infoHeader.biBitCount);
+        printf("(Your image is %d-bit)\n", infoHeader.biBitCount);
         fclose(fp);
         return;
     }
 
     int width = infoHeader.biWidth;
-    int height = abs(infoHeader.biHeight);
-    int isBottomUp = (infoHeader.biHeight > 0);
+    int height;
+    int isBottomUp;
+
+    if (infoHeader.biHeight > 0)
+     {
+         height = infoHeader.biHeight;  
+         isBottomUp = 1;
+      } 
+      else
+       {
+         height = -infoHeader.biHeight; 
+         isBottomUp = 0;
+        }
+
     int imageSize=width*height;
 
 
@@ -503,79 +517,78 @@ void compressBMPBitPlaneMSB(const char *inputFile)
     
     printf(" Total pixels: %d\n\n", imageSize);
 
-    // int rowPadding = (4 - (width % 4)) % 4;
     
     unsigned char palette[1024];
     fread(palette,1,1024,fp);
-    // fseek(fp, fileHeader.bfOffBits, SEEK_SET);
-//debug
-    if (infoHeader.biCompression != 0) // 0 is BI_RGB (Uncompressed)
-    {
-        printf("Error: Compressed BMPs (RLE) are not supported.\n");
-        printf("biCompression value: %d\n", infoHeader.biCompression);
-        fclose(fp);
-        return;
-    }
     fseek(fp, fileHeader.bfOffBits, SEEK_SET);
 
-
-
     unsigned char *imageData=(unsigned char*)malloc(imageSize);
-    int rowPadding = (4 - (width % 4)) % 4;
+
+    int remainder = width % 4;
+    int missing   = 4 - remainder;
+    int rowPadding = missing % 4;
+
     unsigned char padBuffer[4];
 
     printf("Reading Image...\n");
     long startPos = ftell(fp);
 
-    //   for (int i = 0; i < height; i++)
-    //     {
-    //       int row = isBottomUp ? (height - 1 - i) : i;
-    //       fread(imageData + row * width, 1, width, fp);
-    //       fseek(fp, rowPadding, SEEK_CUR);
-    //     }
-   for (int i = 0; i < height; i++)
+for (int i = 0; i < height; i++)
     {
-       
-        int row = isBottomUp ? (height - 1 - i) : i;
-        size_t bytesRead = fread(imageData + row * width, 1, width, fp);
-        
-        if (bytesRead < width)
-        {
-            printf("⚠️ WARNING: File ended early at Row %d!\n", i);
-            printf("   Expected %d bytes, got %zu.\n", width, bytesRead);
-            break; // Stop reading to avoid crash
-        }
+      int row;
 
-        if (rowPadding > 0)
-        {
-            fread(padBuffer, 1, rowPadding, fp);
-        }
-    }
+       if (isBottomUp)
+            {
+               row = height - 1 - i;
+             }
+        else
+            {
+               row = i;
+             }
+
+       size_t bytesRead = fread(imageData + row * width, 1, width, fp);
+       if (bytesRead < width)
+                  {
+                     printf("WARNING");
+                     printf("   Expected %d bytes, got %zu.\n", width, bytesRead);
+                     break; 
+                  }
+            if (rowPadding > 0)
+                    {
+                       fread(padBuffer, 1, rowPadding, fp);
+                      }
+                     }
     
-    // Debug
     long endPos = ftell(fp);
     printf("Read finished. Bytes read from pixel array: %ld\n", endPos - startPos);
-    
     
     fclose(fp);
 
     printf("Step 1: Extracting MSB from each pixel...\n");
+
     unsigned char *msbPlane = (unsigned char*)malloc(imageSize);
     for(int i = 0; i < imageSize; i++)
     {
         msbPlane[i] = (imageData[i] >> 7) & 1;
     }
     printf("Step 2: Packing MSB bits into bytes...\n");
-    int packedSize = (imageSize + 7) / 8;
+    int packedSize = imageSize / 8;
+      if (imageSize % 8 != 0)
+            {
+             packedSize++;
+             }
+
     unsigned char *packed = (unsigned char*)calloc(packedSize, 1);
     
     for(int i = 0; i < imageSize; i++)
     {
         if(msbPlane[i])
         {
-            int byteIndex = i / 8;
-            int bitPosition = 7 - (i % 8); 
-            packed[byteIndex] |= (1 << bitPosition);
+            int byteIndex = i / 8;        
+            int bitIndex  = i % 8;        
+            int bitPos    = 7 - bitIndex;
+            packed[byteIndex] = packed[byteIndex] | (1 << bitPos);
+
         }
     }
 
@@ -584,11 +597,12 @@ void compressBMPBitPlaneMSB(const char *inputFile)
 
     char *ext=strrchr(compressedFile,'.');
     if(ext)*ext='\0';
+
     strcat(compressedFile,"_compressed.bps");
 
     fp=fopen(compressedFile,"wb");
 
-   fwrite(&width,sizeof(int),1,fp);
+     fwrite(&width,sizeof(int),1,fp);
      fwrite(&height,sizeof(int),1,fp);
      fwrite(packed,1,packedSize,fp);
 
@@ -608,14 +622,21 @@ void compressBMPBitPlaneMSB(const char *inputFile)
 
 
     printf("Step 3: Decompressing...\n");
+
     fp = fopen(compressedFile, "rb");
     int readWidth, readHeight;
     fread(&readWidth, sizeof(int), 1, fp);
     fread(&readHeight, sizeof(int), 1, fp);
     
     int readImageSize = readWidth * readHeight;
-   
-    int readPackedSize = (readImageSize + 7) / 8;
+   int readPackedSize = readImageSize / 8;
+         if (readImageSize % 8 != 0)
+             {
+               readPackedSize++;
+              }
+
+
+
     unsigned char *readPacked = (unsigned char*)malloc(readPackedSize);
     fread(readPacked, 1, readPackedSize, fp);
     fclose(fp);
@@ -624,9 +645,13 @@ void compressBMPBitPlaneMSB(const char *inputFile)
     unsigned char *unpackedMSB = (unsigned char*)malloc(readImageSize);
     for(int i = 0; i < readImageSize; i++)
     {
-        int byteIndex = i / 8;
-        int bitPosition = 7 - (i % 8);
-        unpackedMSB[i] = (readPacked[byteIndex] >> bitPosition) & 1;
+        int byteIndex = i / 8;      
+        int bitIndex  = i % 8;       
+        int bitPos    = 7 - bitIndex;
+        unsigned char value = readPacked[byteIndex];
+
+          unpackedMSB[i] = (value >> bitPos) & 1;
+
     }
 
     unsigned char *reconstructed = (unsigned char*)calloc(readImageSize, 1);
@@ -637,6 +662,7 @@ void compressBMPBitPlaneMSB(const char *inputFile)
 
     char decompressedFile[MAX_FILENAME];
     strcpy(decompressedFile, inputFile);
+
     ext = strrchr(decompressedFile, '.');
     if(ext) *ext = '\0';
     strcat(decompressedFile, "_decompressed.bmp");
@@ -647,9 +673,18 @@ void compressBMPBitPlaneMSB(const char *inputFile)
     fileHeader.bfOffBits = sizeof(BMPFileHeader) + sizeof(BMPInfoHeader)+ 1024;
 
     fileHeader.bfSize = fileHeader.bfOffBits + infoHeader.biSizeImage;  
-    infoHeader.biHeight = isBottomUp ? height : -height;
+   if (isBottomUp)
+           {
+              infoHeader.biHeight = height;   
+           }
+   else
+           {
+               infoHeader.biHeight = -height;  
+           }
+
 
     fp = fopen(decompressedFile, "wb");
+    
     fwrite(&fileHeader, sizeof(BMPFileHeader), 1, fp);
     fwrite(&infoHeader, sizeof(BMPInfoHeader), 1, fp);
     fwrite(palette, 1, 1024, fp);
@@ -657,7 +692,16 @@ void compressBMPBitPlaneMSB(const char *inputFile)
     unsigned char pad[3] = {0, 0, 0};
     for (int i = 0; i < height; i++)
     {
-        int row = isBottomUp ? (height - 1 - i) : i;
+        int row;
+
+       if (isBottomUp)
+            {
+               row = height - 1 - i;
+             }
+        else
+            {
+               row = i;
+             }
         fwrite(reconstructed + row * width, 1, width, fp);
         fwrite(pad, 1, rowPadding, fp);
     }
@@ -709,12 +753,25 @@ void compressBMPBitPlaneFull(const char *inputFile)
     }
 
     int width = infoHeader.biWidth;
-    int height = abs(infoHeader.biHeight);
-    int isBottomUp = (infoHeader.biHeight > 0);
+    int height;
+    int isBottomUp;
+
+    if (infoHeader.biHeight > 0)
+     {
+         height = infoHeader.biHeight;  
+         isBottomUp = 1;
+      } 
+      else
+       {
+         height = -infoHeader.biHeight; 
+         isBottomUp = 0;
+        }
     int imageSize=width*height;
 
-    int rowPadding = (4 - (width % 4)) % 4;
-    
+   int remainder = width % 4;
+   int missing   = 4 - remainder;
+   int rowPadding = missing % 4;
+
     unsigned char palette[1024];
     fread(palette,1,1024,fp);
     fseek(fp, fileHeader.bfOffBits, SEEK_SET);
@@ -722,7 +779,17 @@ void compressBMPBitPlaneFull(const char *inputFile)
     unsigned char *imageData=(unsigned char*)malloc(imageSize);
     for (int i = 0; i < height; i++)
     {
-        int row = isBottomUp ? (height - 1 - i) : i;
+       int row;
+
+       if (isBottomUp)
+            {
+                row = height - 1 - i;
+             }
+       else
+             {
+                 row = i;
+             }
+
         fread(imageData + row * width, 1, width, fp);
         fseek(fp, rowPadding, SEEK_CUR);
     }
@@ -750,9 +817,13 @@ void compressBMPBitPlaneFull(const char *inputFile)
         {
             if(bitPlanes[plane][i])
             {
-                int byteIndex = (plane * packedSizePerPlane) + (i / 8);
-                int bitPosition = 7 - (i % 8); 
-                allPackedData[byteIndex] |= (1 << bitPosition);
+                int planeOffset = plane * packedSizePerPlane;
+                int byteInPlane = i / 8;
+                int byteIndex = planeOffset + byteInPlane;
+
+                int bitPos = 7 - (i % 8);
+                allPackedData[byteIndex] |= (1 << bitPos);
+
             }
         }
     }
@@ -777,7 +848,10 @@ void compressBMPBitPlaneFull(const char *inputFile)
     long compressedSize = sizeof(int)*2 + totalPackedSize;
     printf("Original Size: %ld bytes\n", originalSize);
     printf("Compressed Size: %ld bytes\n", compressedSize);
-    printf("Reduction: %.2f%%\n", (1.0 - ((double)compressedSize / originalSize)) * 100.0);
+   
+    double reduction = 1.0 - (double)compressedSize / originalSize;
+    reduction = reduction * 100; 
+    printf("Reduction: %.2f%%\n", reduction);
 
     printf("Step 3: Decompressing...\n");
     fp = fopen(compressedFile, "rb");
@@ -786,7 +860,7 @@ void compressBMPBitPlaneFull(const char *inputFile)
     fread(&readHeight, sizeof(int), 1, fp);
     
     int readImageSize = readWidth * readHeight;
-    int readPackedSizePerPlane = (readImageSize + 7) / 8;
+    int readPackedSizePerPlane = (readImageSize + 7)/ 8;
     int readTotalPackedSize = readPackedSizePerPlane * 8;
     
     unsigned char *readPacked = (unsigned char*)malloc(readTotalPackedSize);
@@ -799,12 +873,19 @@ void compressBMPBitPlaneFull(const char *inputFile)
     {
         for(int i = 0; i < readImageSize; i++)
         {
-            int byteIndex = (plane * readPackedSizePerPlane) + (i / 8);
-            int bitPosition = 7 - (i % 8);
-            if((readPacked[byteIndex] >> bitPosition) & 1)
-            {
-                reconstructed[i] |= (1 << plane);
-            }
+            int planeOffset = plane * readPackedSizePerPlane;
+            int byteInPlane = i / 8;
+            int byteIndex = planeOffset + byteInPlane;
+
+            int bitPos = 7 - (i % 8);
+
+            int value = (readPacked[byteIndex] >> bitPos) & 1;
+
+               if (value == 1)
+                       {
+                          reconstructed[i] |= (1 << plane);
+                        }
+
         }
     }
 
@@ -816,8 +897,17 @@ void compressBMPBitPlaneFull(const char *inputFile)
 
     infoHeader.biSizeImage = (width + rowPadding) * height;
     fileHeader.bfOffBits = sizeof(BMPFileHeader) + sizeof(BMPInfoHeader)+ 1024;
-    fileHeader.bfSize = fileHeader.bfOffBits + infoHeader.biSizeImage;  
-    infoHeader.biHeight = isBottomUp ? height : -height;
+    fileHeader.bfSize = fileHeader.bfOffBits + infoHeader.biSizeImage; 
+
+    if (isBottomUp)
+         {
+           infoHeader.biHeight = height;  
+         }
+    else
+         {
+           infoHeader.biHeight = -height;  
+         }
+
 
     fp = fopen(decompressedFile, "wb");
     fwrite(&fileHeader, sizeof(BMPFileHeader), 1, fp);
@@ -825,16 +915,25 @@ void compressBMPBitPlaneFull(const char *inputFile)
     fwrite(palette, 1, 1024, fp);
     
     unsigned char pad[3] = {0, 0, 0};
+
     for (int i = 0; i < height; i++)
     {
-        int row = isBottomUp ? (height - 1 - i) : i;
+        int row;
+        if (isBottomUp)
+            {
+               row = height - 1 - i;
+             }
+        else
+            {
+               row = i;
+             }
+
         fwrite(reconstructed + row * width, 1, width, fp);
         fwrite(pad, 1, rowPadding, fp);
     }
     fclose(fp);
     printf("File decompressed successfully: %s\n", decompressedFile);
 
-    // Cleanup
     free(imageData);
     for(int plane = 0; plane < 8; plane++) free(bitPlanes[plane]);
     free(allPackedData);
@@ -845,7 +944,7 @@ void compressBMPBitPlaneFull(const char *inputFile)
 void processBMPFile(const char* fileName)
 {
     int choice;
-    printf("\n=== BMP Compression Options ===\n");
+    printf("\n===========BMP Compression Options========\n");
     printf("1. MSB Bit Plane Compression (Lossy - Higher compression)\n");
     printf("2. Full Bit Plane Compression (Lossless - Preserves quality)\n");
     printf("3. Both methods\n");
@@ -866,8 +965,7 @@ void processBMPFile(const char* fileName)
             compressBMPBitPlaneFull(fileName);
             break;
         default:
-            printf("Invalid choice. Using Full Bit Plane Compression.\n");
-            compressBMPBitPlaneFull(fileName);
+            printf("Invalid choice.\n");
             break;
     }
 }
@@ -884,31 +982,32 @@ void processFile(const char* fileName)
         case TEXT_FILE:
             printf("Processing text file: %s\n", fileName);
             compressTextHuffman(fileName);
+            printf("===========Processing Done==========");
             break;
         case BMP_FILE:
             processBMPFile(fileName);
+            printf("===========Processing Done==========");
             break;    
 
         default:
             printf("Unsupported file type for file: %s\n", fileName);
             break;
    }
-printf("===========Processing Done=========");
+
 }
 
 int main()
 {
     char filename[MAX_FILENAME];
 
-    printf("         Multi-Format Compression & Decompression Tool         \n");
-   
-    printf("Supported Formats:\n");
-    printf("  1. Text Files (.txt)\n");
-    printf("     • Algorithm: Huffman Coding (Variable-length encoding)\n");
-    printf("     • Type: Lossless compression\n\n");
+    printf(" ============== Multi-Format Compression & Decompression Tool ==============\n");
+    printf("Menu:\n");
+    printf("Supported File Formats:\n");
+    printf("1. Text Files (.txt)\n");
     printf("  2. BMP Image Files (.bmp) - 8-bit Grayscale only\n");
-    printf("     • MSB Bit Plane: Lossy, ~87%% compression\n");
-    printf("     • Full Bit Plane: Lossless, preserves quality\n\n");
+    printf("     - MSB Bit Plane\n");
+    printf("     - Full Bit Plane\n\n");
+
     printf("Enter the filename: ");
 
     if(fgets(filename,sizeof(filename),stdin)!=NULL)
