@@ -1,14 +1,19 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
+#define _POSIX_C_SOURCE 200809L
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <math.h>
 
 #define MAX_FILENAME 256
 #define MAX_TEXT_SIZE 1000000
 #define MAX_TREE_NODES 512
+#define PI 3.14159265358979323846
 
 typedef enum{
     TEXT_FILE,
     BMP_FILE,
+    FILE_COLOR,
     UNKNOWN_FILE
 }FileType;
  
@@ -40,6 +45,31 @@ typedef struct
 
 #pragma pack(pop)
 
+
+
+char *getFileExtension(const char *filename)
+{
+    char *ext = strrchr(filename, '.');
+    if (ext == NULL)
+    {
+        return NULL;
+    }
+
+    static char lower_ext[10];
+    int i = 0;
+    ext++;
+
+    while (*ext && i < 9)
+    {
+        lower_ext[i++] = (char)tolower((unsigned char)*ext++);
+    }
+
+    lower_ext[i] = '\0';
+
+    return lower_ext;
+}
+
+
 FileType detectFileType(const char *fileName)
 {
     int i;
@@ -66,6 +96,12 @@ FileType detectFileType(const char *fileName)
         {
             return BMP_FILE;
         }
+    if(strcmp(ext, ".ppm") == 0||
+       strcmp(ext,".jpg")==0||
+       strcmp(ext,".jpeg")==0)
+        {
+            return FILE_COLOR;
+        }    
 
     return UNKNOWN_FILE;
 }
@@ -720,6 +756,9 @@ for (int i = 0; i < height; i++)
 
 
 void compressBMPBitPlaneFull(const char *inputFile)
+
+
+
 {
     printf("Detected: BMP ImageFile\n");
     printf("Bit Plane Slicing (Full Lossless) is used for compression.\n");
@@ -941,6 +980,224 @@ void compressBMPBitPlaneFull(const char *inputFile)
     free(reconstructed);
 }
 
+
+typedef struct{
+        int width;
+        int height;
+        int maxVal;
+
+        int**R;
+        int**G;
+        int**B;
+
+}ColorImage;
+
+ColorImage *loadColorImage(const char *filename){
+              FILE *fp = fopen(filename, "r");
+              if(fp==NULL)
+              {
+                printf("Error opening file: %s\n", filename);
+                return NULL;
+              }
+
+        ColorImage *img=(ColorImage*)malloc(sizeof(ColorImage));
+        char magic[3];
+        fscanf(fp,"%s",magic);
+
+         char c =fgetc(fp);
+         while(c=='#' || c=='\n' || c==' ')
+              {
+                  if(c=='#')
+                     {
+                        while(fgetc(fp) !='\n');
+                      }
+                  c=fgetc(fp);
+              }
+              ungetc(c,fp);
+              fscanf(fp, "%d %d %d", &img->width, &img->height, &img->maxVal);
+
+              img->R=(int**)malloc(img->height*sizeof(int*));
+              img->G=(int**)malloc(img->height*sizeof(int*)); 
+              img->B=(int**)malloc(img->height*sizeof(int*));
+
+              for (int i=0;i<img->height;i++)
+                 {
+                   img->R[i]=(int*)malloc(img->width*sizeof(int));
+                   img->G[i]=(int*)malloc(img->width*sizeof(int));
+                   img->B[i]=(int*)malloc(img->width*sizeof(int));
+    
+                  for(int j=0;j<img->width;j++)
+                    {
+                       fscanf(fp,"%d %d %d",&img->R[i][j],&img->G[i][j],&img->B[i][j]);
+                     }
+                 }
+    fclose(fp);
+    return img;
+}
+void saveColorImage(const char * filename, ColorImage* img) {
+                FILE *fp = fopen(filename, "w");
+                if(fp==NULL)
+                {
+                    printf("Error opening file: %s\n", filename);
+                    return;
+                }
+    
+        fprintf(fp,"P3\n%d %d\n%d\n",img->width,img->height,img->maxVal);
+    
+        for(int i=0;i<img->height;i++)
+        {
+            for(int j=0;j<img->width;j++)
+            {
+                fprintf(fp,"%d %d %d ",img->R[i][j],img->G[i][j],img->B[i][j]);
+            }
+            fprintf(fp,"\n");
+        }
+        fclose(fp);
+
+}
+double dctCoeff(int x,int y, int u, int v, int N){
+         double cu=(u==0)? 1.0/sqrt(2.0) :1.0;
+         double cv =(v==0)? 1.0/sqrt(2.0) :1.0;
+
+         return (2.0/N)* cu*cv*cos((2*x+1)*u*PI/(2.0*N))*cos((2*y+1)*v*PI/(2.0*N));
+}
+
+void dct2D(int block[8][8],double dctBlock[8][8]){
+    int N=8;
+        for(int u=0;u<N;u++)
+        {
+            for(int v=0;v<N;v++)
+            {
+                double sum=0.0;
+                for(int x=0;x<N;x++)
+                {
+                    for(int y=0;y<N;y++)
+                    {
+                        sum+=block[x][y]*dctCoeff(x,y,u,v,N);
+                    }
+                }
+                dctBlock[u][v]=sum;
+            }
+        }
+
+}
+
+void idct2D(double dctBlock[8][8], int block[8][8],int maxVal){
+    int N=8;
+        for(int x=0;x<N;x++)
+        {
+            for(int y=0;y<N;y++)
+            {
+                double sum=0.0;
+                for(int u=0;u<N;u++)
+                {
+                    for(int v=0;v<N;v++)
+                    {
+                        sum+=dctBlock[u][v]*dctCoeff(x,y,u,v,N);
+                    }
+                }
+               int val = (int)round(sum);
+               if (val < 0) val = 0;
+               if (val > maxVal) val = maxVal;
+               block[x][y] = val;
+            }
+        }
+}
+
+void quantize(double dctBlock[8][8], int quality) {
+    int qFactor = (quality > 0) ? quality : 1;
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            dctBlock[i][j] = round(dctBlock[i][j] / qFactor);
+        }
+    }
+}
+
+void dequantize(double dctBlock[8][8], int quality) {
+    int qFactor = (quality > 0) ? quality : 1;
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            dctBlock[i][j] = dctBlock[i][j] * qFactor;
+        }
+    }
+}
+void compressChannel(int** channel, int width, int height, int maxVal, int quality) {
+    for (int i = 0; i < height; i += 8) {
+        for (int j = 0; j < width; j += 8) {
+            int block[8][8] = {0};
+            double dctBlock[8][8];
+            
+            for (int x = 0; x < 8 && i + x < height; x++) {
+                for (int y = 0; y < 8 && j + y < width; y++) {
+                    block[x][y] = channel[i + x][j + y];
+                }
+            }
+            
+            dct2D(block, dctBlock);
+            quantize(dctBlock, quality);
+            dequantize(dctBlock, quality);
+            idct2D(dctBlock, block, maxVal);
+            
+            for (int x = 0; x < 8 && i + x < height; x++) {
+                for (int y = 0; y < 8 && j + y < width; y++) {
+                    channel[i + x][j + y] = block[x][y];
+                }
+            }
+        }
+    }
+}
+void freeColorImage(ColorImage* img) {
+    if (img == NULL) return;
+    for (int i = 0; i < img->height; i++) {
+        free(img->R[i]);
+        free(img->G[i]);
+        free(img->B[i]);
+    }
+    free(img->R);
+    free(img->G);
+    free(img->B);
+    free(img);
+}
+
+void processColorImage(const char* inputFile) {
+    printf("Detected: COLOR IMAGE\n");
+    printf("Using: DCT (Discrete Cosine Transform)\n\n");
+    
+    ColorImage* img = loadColorImage(inputFile);
+    if (img == NULL) return;
+    
+    int quality = 50;
+    
+    printf("Applying DCT compression...\n");
+    compressChannel(img->R, img->width, img->height, img->maxVal, quality);
+    compressChannel(img->G, img->width, img->height, img->maxVal, quality);
+    compressChannel(img->B, img->width, img->height, img->maxVal, quality);
+    
+    char compressedFile[MAX_FILENAME];
+    strcpy(compressedFile, inputFile);
+    char* ext = strrchr(compressedFile, '.');
+    if (ext) *ext = '\0';
+    strcat(compressedFile, "_compressed.ppm");
+    
+    saveColorImage(compressedFile, img);
+    printf("Color image compressed using DCT (quality: %d)\n", quality);
+    printf("Saved to: %s\n", compressedFile);
+    
+    char decompressedFile[MAX_FILENAME];
+    strcpy(decompressedFile, inputFile);
+    ext = strrchr(decompressedFile, '.');
+    if (ext) *ext = '\0';
+    strcat(decompressedFile, "_decompressed.jpg");
+    
+    saveColorImage(decompressedFile, img);
+    printf("Color image decompressed and saved to: %s\n", decompressedFile);
+    
+    freeColorImage(img);
+}
+
+
+
+
 void processBMPFile(const char* fileName)
 {
     int choice;
@@ -987,13 +1244,16 @@ void processFile(const char* fileName)
         case BMP_FILE:
             processBMPFile(fileName);
             printf("===========Processing Done==========");
-            break;    
+            break;  
+         case FILE_COLOR:
+            processColorImage(fileName);
+            break;     
 
         default:
             printf("Unsupported file type for file: %s\n", fileName);
             break;
    }
-
+  printf("===========Processing Done==========");
 }
 
 int main()
@@ -1007,6 +1267,7 @@ int main()
     printf("  2. BMP Image Files (.bmp) - 8-bit Grayscale only\n");
     printf("     - MSB Bit Plane\n");
     printf("     - Full Bit Plane\n\n");
+    printf("3. Color images (.jpg) - DCT\n");
 
     printf("Enter the filename: ");
 
