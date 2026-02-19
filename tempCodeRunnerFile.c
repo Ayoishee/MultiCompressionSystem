@@ -87,7 +87,7 @@ FileType detectFileType(const char *fileName)
                 return FILE_COLOR;
             }
         }
-        return BMP_FILE; 
+        return BMP_FILE; // Default to grayscale if can't read
     }
     
     if(strcmp(ext, ".ppm") == 0 ||
@@ -535,7 +535,7 @@ void compressBMPBitPlaneMSB(const char *inputFile)
          height = infoHeader.biHeight;  
          isBottomUp = 1;
       } 
-    else
+      else
        {
          height = -infoHeader.biHeight; 
          isBottomUp = 0;
@@ -564,7 +564,7 @@ void compressBMPBitPlaneMSB(const char *inputFile)
     unsigned char padBuffer[4];
 
     printf("Reading Image...\n");
-     long startPos = ftell(fp);
+    long startPos = ftell(fp);
 
 for (int i = 0; i < height; i++)
     {
@@ -580,7 +580,7 @@ for (int i = 0; i < height; i++)
              }
 
        size_t bytesRead = fread(imageData + row * width, 1, width, fp);
-       if (bytesRead < (size_t)width)
+       if (bytesRead < width)
                   {
                      printf("WARNING");
                      printf("   Expected %d bytes, got %zu.\n", width, bytesRead);
@@ -592,7 +592,7 @@ for (int i = 0; i < height; i++)
                       }
                      }
     
-     long endPos = ftell(fp);
+    long endPos = ftell(fp);
     printf("Read finished. Bytes read from pixel array: %ld\n", endPos - startPos);
     
     fclose(fp);
@@ -1024,13 +1024,10 @@ ColorImage*load32BitBMP(const char *filename) {
     
     int height;
     int isBottomUp;
-    if (infoHeader.biHeight > 0) 
-    {
+    if (infoHeader.biHeight > 0) {
         height = infoHeader.biHeight;
         isBottomUp = 1;
-    }
-     else 
-     {
+    } else {
         height = -infoHeader.biHeight;
         isBottomUp = 0;
     }
@@ -1038,21 +1035,18 @@ ColorImage*load32BitBMP(const char *filename) {
     img->maxVal = 255;
     img->hasAlpha = (infoHeader.biBitCount == 32) ? 1 : 0;
 
+    // Allocate memory
     img->R = (int**)malloc(height * sizeof(int*));
     img->G = (int**)malloc(height * sizeof(int*));
     img->B = (int**)malloc(height * sizeof(int*));
     
-    if(img->hasAlpha)
-     {
+    if(img->hasAlpha) {
         img->A = (int**)malloc(height * sizeof(int*));
-    } 
-    else 
-    {
+    } else {
         img->A = NULL;
     }
 
-    for(int i = 0; i < height; i++) 
-    {
+    for(int i = 0; i < height; i++) {
         img->R[i] = (int*)malloc(img->width * sizeof(int));
         img->G[i] = (int*)malloc(img->width * sizeof(int));
         img->B[i] = (int*)malloc(img->width * sizeof(int));
@@ -1061,8 +1055,10 @@ ColorImage*load32BitBMP(const char *filename) {
         }
     }
 
+    // Seek to pixel data
     fseek(fp, fileHeader.bfOffBits, SEEK_SET);
 
+    // Calculate row padding
     int bytesPerPixel = img->hasAlpha ? 4 : 3;
     int rowSize = img->width * bytesPerPixel;
     int rowPadding = (4 - (rowSize % 4)) % 4;
@@ -1072,26 +1068,23 @@ ColorImage*load32BitBMP(const char *filename) {
     printf("  Bit depth: %d-bit (%s)\n", infoHeader.biBitCount, img->hasAlpha ? "RGBA" : "RGB");
     printf("  Channels: %d\n\n", img->hasAlpha ? 4 : 3);
 
+    // Read pixel data
     unsigned char padBuffer[4];
-
-    for(int i = 0; i < height; i++) 
-    {
+    for(int i = 0; i < height; i++) {
         int row = isBottomUp ? (height - 1 - i) : i;
         
-        for(int j = 0; j < img->width; j++)
-         {
+        for(int j = 0; j < img->width; j++) {
             unsigned char pixel[4];
             
-            if(img->hasAlpha) 
-            {
+            if(img->hasAlpha) {
+                // 32-bit: BGRA format
                 fread(pixel, 1, 4, fp);
                 img->B[row][j] = pixel[0];
                 img->G[row][j] = pixel[1];
                 img->R[row][j] = pixel[2];
                 img->A[row][j] = pixel[3];
-            } 
-            else
-             {
+            } else {
+                // 24-bit: BGR format
                 fread(pixel, 1, 3, fp);
                 img->B[row][j] = pixel[0];
                 img->G[row][j] = pixel[1];
@@ -1123,6 +1116,7 @@ void save32BitBMP(const char *filename, ColorImage *img) {
     int rowPadding = (4 - (rowSize % 4)) % 4;
     int imageSize = (rowSize + rowPadding) * img->height;
 
+    // Fill BMP headers
     fileHeader.bfType = 0x4D42;
     fileHeader.bfReserved1 = 0;
     fileHeader.bfReserved2 = 0;
@@ -1131,7 +1125,7 @@ void save32BitBMP(const char *filename, ColorImage *img) {
 
     infoHeader.biSize = sizeof(BMPInfoHeader);
     infoHeader.biWidth = img->width;
-    infoHeader.biHeight = img->height;  
+    infoHeader.biHeight = img->height;  // Positive = bottom-up
     infoHeader.biPlanes = 1;
     infoHeader.biBitCount = img->hasAlpha ? 32 : 24;
     infoHeader.biCompression = 0;
@@ -1141,27 +1135,24 @@ void save32BitBMP(const char *filename, ColorImage *img) {
     infoHeader.biClrUsed = 0;
     infoHeader.biClrImportant = 0;
 
+    // Write headers
     fwrite(&fileHeader, sizeof(BMPFileHeader), 1, fp);
     fwrite(&infoHeader, sizeof(BMPInfoHeader), 1, fp);
 
+    // Write pixel data (bottom-up)
     unsigned char pad[3] = {0, 0, 0};
-    for(int i = img->height - 1; i >= 0; i--) 
-    {
-        for(int j = 0; j < img->width; j++)
-         {
+    for(int i = img->height - 1; i >= 0; i--) {
+        for(int j = 0; j < img->width; j++) {
             unsigned char pixel[4];
             
-            if(img->hasAlpha) 
-            {
+            if(img->hasAlpha) {
                 // 32-bit: BGRA format
                 pixel[0] = (unsigned char)img->B[i][j];
                 pixel[1] = (unsigned char)img->G[i][j];
                 pixel[2] = (unsigned char)img->R[i][j];
                 pixel[3] = (unsigned char)img->A[i][j];
                 fwrite(pixel, 1, 4, fp);
-            } 
-            else 
-            {
+            } else {
                 // 24-bit: BGR format
                 pixel[0] = (unsigned char)img->B[i][j];
                 pixel[1] = (unsigned char)img->G[i][j];
@@ -1170,8 +1161,7 @@ void save32BitBMP(const char *filename, ColorImage *img) {
             }
         }
         
-        if(rowPadding > 0)
-         {
+        if(rowPadding > 0) {
             fwrite(pad, 1, rowPadding, fp);
         }
     }
@@ -1212,19 +1202,16 @@ ColorImage *loadPPMImage(const char *filename) {
     }
     ungetc(c,fp);
     
-    if(img->hasAlpha) 
-    {
+    if(img->hasAlpha) {
+        // P7 format has different header
         char line[256];
-        while(fgets(line, sizeof(line), fp))
-         {
+        while(fgets(line, sizeof(line), fp)) {
             if(strstr(line, "WIDTH")) sscanf(line, "WIDTH %d", &img->width);
             if(strstr(line, "HEIGHT")) sscanf(line, "HEIGHT %d", &img->height);
             if(strstr(line, "MAXVAL")) sscanf(line, "MAXVAL %d", &img->maxVal);
             if(strstr(line, "ENDHDR")) break;
         }
-    } 
-    else 
-    {
+    } else {
         fscanf(fp, "%d %d %d", &img->width, &img->height, &img->maxVal);
     }
 
@@ -1232,12 +1219,9 @@ ColorImage *loadPPMImage(const char *filename) {
     img->G=(int**)malloc(img->height*sizeof(int*)); 
     img->B=(int**)malloc(img->height*sizeof(int*));
     
-    if(img->hasAlpha) 
-    {
+    if(img->hasAlpha) {
         img->A=(int**)malloc(img->height*sizeof(int*));
-    } 
-    else
-     {
+    } else {
         img->A = NULL;
     }
 
@@ -1246,14 +1230,12 @@ ColorImage *loadPPMImage(const char *filename) {
         img->R[i]=(int*)malloc(img->width*sizeof(int));
         img->G[i]=(int*)malloc(img->width*sizeof(int));
         img->B[i]=(int*)malloc(img->width*sizeof(int));
-        if(img->hasAlpha) 
-        {
+        if(img->hasAlpha) {
             img->A[i]=(int*)malloc(img->width*sizeof(int));
         }
     }
 
-    if(strcmp(magic, "P3") == 0) 
-    {
+    if(strcmp(magic, "P3") == 0) {
         // ASCII format (24-bit)
         for(int i=0;i<img->height;i++)
         {
@@ -1262,9 +1244,7 @@ ColorImage *loadPPMImage(const char *filename) {
                 fscanf(fp,"%d %d %d",&img->R[i][j],&img->G[i][j],&img->B[i][j]);
             }
         }
-    } 
-    else if(strcmp(magic, "P6") == 0)
-     {
+    } else if(strcmp(magic, "P6") == 0) {
         // P6 Binary format (24-bit)
         fgetc(fp); // Skip last newline
         for(int i=0;i<img->height;i++)
@@ -1278,9 +1258,7 @@ ColorImage *loadPPMImage(const char *filename) {
                 img->B[i][j] = rgb[2];
             }
         }
-    } 
-    else if(strcmp(magic, "P7") == 0) 
-    {
+    } else if(strcmp(magic, "P7") == 0) {
         // P7 Binary format (32-bit RGBA)
         for(int i=0;i<img->height;i++)
         {
@@ -1300,33 +1278,28 @@ ColorImage *loadPPMImage(const char *filename) {
     return img;
 }
 
-ColorImage *loadColorImage(const char *filename) 
-{
+ColorImage *loadColorImage(const char *filename) {
     const char *ext = strrchr(filename, '.');
-    if(ext == NULL) 
-    {
+    if(ext == NULL) {
         printf("No file extension found\n");
         return NULL;
     }
     
-    if(strcmp(ext, ".bmp") == 0 || strcmp(ext, ".BMP") == 0)
-     {
+    // Check if it's a BMP file
+    if(strcmp(ext, ".bmp") == 0 || strcmp(ext, ".BMP") == 0) {
+        // Check if it's a color BMP (24-bit or 32-bit)
         FILE *fp = fopen(filename, "rb");
-        if(fp) 
-        {
+        if(fp) {
             BMPFileHeader fileHeader;
             BMPInfoHeader infoHeader;
             fread(&fileHeader, sizeof(BMPFileHeader), 1, fp);
             fread(&infoHeader, sizeof(BMPInfoHeader), 1, fp);
             fclose(fp);
             
-            if(infoHeader.biBitCount == 24 || infoHeader.biBitCount == 32)
-             {
+            if(infoHeader.biBitCount == 24 || infoHeader.biBitCount == 32) {
                 return load32BitBMP(filename);
-            } 
-            else if(infoHeader.biBitCount == 8)
-             {
-                printf("\n  This is an 8-bit grayscale BMP.\n");
+            } else if(infoHeader.biBitCount == 8) {
+                printf("\n⚠️  This is an 8-bit grayscale BMP.\n");
                 printf("Please use the BMP compression option (Bit Plane Slicing) instead.\n");
                 return NULL;
             }
@@ -1355,20 +1328,17 @@ ColorImage *loadColorImage(const char *filename)
         
         return NULL;
         
-    } 
-    else if(strcmp(ext, ".ppm") == 0 || strcmp(ext, ".PPM") == 0 ||
-              strcmp(ext, ".pam") == 0 || strcmp(ext, ".PAM") == 0) 
-              {
-              return loadPPMImage(filename);
-              }
+    } else if(strcmp(ext, ".ppm") == 0 || strcmp(ext, ".PPM") == 0 ||
+              strcmp(ext, ".pam") == 0 || strcmp(ext, ".PAM") == 0) {
+        return loadPPMImage(filename);
+    }
     
     printf("Unsupported image format: %s\n", ext);
     printf("Supported: .bmp (24/32-bit), .ppm, .pam\n");
     return NULL;
 }
 
-void saveColorImage(const char * filename, ColorImage* img) 
-{
+void saveColorImage(const char * filename, ColorImage* img) {
     const char *ext = strrchr(filename, '.');
     
     // Save as BMP if extension is .bmp
@@ -1377,6 +1347,7 @@ void saveColorImage(const char * filename, ColorImage* img)
         return;
     }
     
+    // Otherwise save as PPM/PAM
     FILE *fp = fopen(filename, "wb");
     if(fp==NULL)
     {
@@ -1406,9 +1377,7 @@ void saveColorImage(const char * filename, ColorImage* img)
                 fwrite(rgba, 1, 4, fp);
             }
         }
-    }
-     else 
-     {
+    } else {
         // Save as P3 (24-bit ASCII)
         fprintf(fp,"P3\n%d %d\n%d\n",img->width,img->height,img->maxVal);
         
@@ -1425,16 +1394,14 @@ void saveColorImage(const char * filename, ColorImage* img)
     fclose(fp);
 }
 
-double dctCoeff(int x,int y, int u, int v, int N)
-{
+double dctCoeff(int x,int y, int u, int v, int N){
     double cu=(u==0)? 1.0/sqrt(2.0) :1.0;
     double cv =(v==0)? 1.0/sqrt(2.0) :1.0;
 
     return (2.0/N)* cu*cv*cos((2*x+1)*u*PI/(2.0*N))*cos((2*y+1)*v*PI/(2.0*N));
 }
 
-void dct2D(int block[8][8],double dctBlock[8][8])
-{
+void dct2D(int block[8][8],double dctBlock[8][8]){
     int N=8;
     for(int u=0;u<N;u++)
     {
@@ -1453,8 +1420,7 @@ void dct2D(int block[8][8],double dctBlock[8][8])
     }
 }
 
-void idct2D(double dctBlock[8][8], int block[8][8],int maxVal)
-{
+void idct2D(double dctBlock[8][8], int block[8][8],int maxVal){
     int N=8;
     for(int x=0;x<N;x++)
     {
@@ -1476,100 +1442,49 @@ void idct2D(double dctBlock[8][8], int block[8][8],int maxVal)
     }
 }
 
-void quantize(double dctBlock[8][8], int quality) 
-{
+void quantize(double dctBlock[8][8], int quality) {
     int qFactor = (quality > 0) ? quality : 1;
-    for (int i = 0; i < 8; i++)
-     {
-        for (int j = 0; j < 8; j++) 
-        {
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
             dctBlock[i][j] = round(dctBlock[i][j] / qFactor);
         }
     }
 }
 
-void dequantize(double dctBlock[8][8], int quality)
- {
+void dequantize(double dctBlock[8][8], int quality) {
     int qFactor = (quality > 0) ? quality : 1;
-    for (int i = 0; i < 8; i++)
-     {
-        for (int j = 0; j < 8; j++) 
-        {
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
             dctBlock[i][j] = dctBlock[i][j] * qFactor;
         }
     }
 }
-typedef struct {
-    long totalCoeffs;
-   long nonZeroCoeffs;
-} DCTStats;
 
-// void compressChannel(int** channel, int width, int height, int maxVal, int quality) {
-//     for (int i = 0; i < height; i += 8) {
-//         for (int j = 0; j < width; j += 8) {
-//             int block[8][8] = {0};
-//             double dctBlock[8][8];
-            
-//             for (int x = 0; x < 8 && i + x < height; x++) {
-//                 for (int y = 0; y < 8 && j + y < width; y++) {
-//                     block[x][y] = channel[i + x][j + y];
-//                 }
-//             }
-            
-//             dct2D(block, dctBlock);
-//             quantize(dctBlock, quality);
-//             dequantize(dctBlock, quality);
-//             idct2D(dctBlock, block, maxVal);
-            
-//             for (int x = 0; x < 8 && i + x < height; x++) {
-//                 for (int y = 0; y < 8 && j + y < width; y++) {
-//                     channel[i + x][j + y] = block[x][y];
-//                 }
-//             }
-//         }
-//     }
-// }
-DCTStats compressChannelWithStats(int **channel, int width, int height, int maxVal, int quality) 
-{
-    DCTStats stats = {0, 0};
-
-    for (int i = 0; i < height; i += 8) 
-    {
-        for (int j = 0; j < width; j += 8) 
-        {
+void compressChannel(int** channel, int width, int height, int maxVal, int quality) {
+    for (int i = 0; i < height; i += 8) {
+        for (int j = 0; j < width; j += 8) {
             int block[8][8] = {0};
             double dctBlock[8][8];
-
-            for (int x = 0; x < 8 && i + x < height; x++)
-                for (int y = 0; y < 8 && j + y < width; y++)
+            
+            for (int x = 0; x < 8 && i + x < height; x++) {
+                for (int y = 0; y < 8 && j + y < width; y++) {
                     block[x][y] = channel[i + x][j + y];
-
-            dct2D(block, dctBlock);
-
-            quantize(dctBlock, quality);
-
-            for (int x = 0; x < 8; x++)
-             {
-                for (int y = 0; y < 8; y++)
-                 {
-                    stats.totalCoeffs++;
-                    if (dctBlock[x][y] != 0.0)
-                        stats.nonZeroCoeffs++;
                 }
             }
-
+            
+            dct2D(block, dctBlock);
+            quantize(dctBlock, quality);
             dequantize(dctBlock, quality);
             idct2D(dctBlock, block, maxVal);
-
-            for (int x = 0; x < 8 && i + x < height; x++)
-                for (int y = 0; y < 8 && j + y < width; y++)
+            
+            for (int x = 0; x < 8 && i + x < height; x++) {
+                for (int y = 0; y < 8 && j + y < width; y++) {
                     channel[i + x][j + y] = block[x][y];
+                }
+            }
         }
     }
-    return stats;
 }
-
-
 
 void freeColorImage(ColorImage* img) {
     if (img == NULL) return;
@@ -1725,9 +1640,7 @@ void processBMPFile(const char* fileName, int operation)
                 printf("Invalid choice.\n");
                 break;
         }
-    } 
-    else
-     {
+    } else {
         // DECOMPRESSION
         FILE *fp = fopen(fileName, "rb");
         if(!fp) {
@@ -1752,7 +1665,7 @@ void processBMPFile(const char* fileName, int operation)
         
         printf("\n=== BMP DECOMPRESSION ===\n");
         
-        if(labs(fileSize - msbSize) < labs(fileSize - fullSize)) {
+        if(abs(fileSize - msbSize) < abs(fileSize - fullSize)) {
             printf("Detected: MSB Bit Plane compressed file\n\n");
             
             // Read compressed data
@@ -1931,113 +1844,12 @@ void processBMPFile(const char* fileName, int operation)
         }
     }
 }
-
-void processColorImage(const char *inputFile){
-    printf("\n=== COLOR IMAGE COMPRESSION ===\n");
-    printf("Algorithm: DCT (Discrete Cosine Transform)\n\n");
-    
-    ColorImage* img = loadColorImage(inputFile);
-    if (img == NULL) {
-        return;
-    }
-    
-    printf("Applying DCT compression to color channels...\n");
-    
-    int quality = 50;
-
-     DCTStats statsR = compressChannelWithStats(img->R, img->width, img->height, img->maxVal, quality);
-     DCTStats statsG = compressChannelWithStats(img->G, img->width, img->height, img->maxVal, quality);
-     DCTStats statsB = compressChannelWithStats(img->B, img->width, img->height, img->maxVal, quality);
-
-    
-    DCTStats statsA = {0, 0};
-
-   if(img->hasAlpha)
-    {
-        printf("Compressing alpha channel...\n");
-        statsA = compressChannelWithStats(img->A, img->width, img->height, img->maxVal, quality);
-   }
-    
-
-int channels = img->hasAlpha ? 4 : 3;
-   long originalSize = (long)img->width * img->height * channels;
-
-   long totalNonZero = statsR.nonZeroCoeffs + statsG.nonZeroCoeffs +
-                       statsB.nonZeroCoeffs + statsA.nonZeroCoeffs;
-    long totalCoeffs  = statsR.totalCoeffs  + statsG.totalCoeffs  +
-                        statsB.totalCoeffs  + statsA.totalCoeffs;
-
-   /* Each surviving coefficient stored as a 16-bit (2-byte) value */
-   long compressedSize = totalNonZero * 2;
-
-   double reduction = (1.0 - (double)compressedSize / (double)originalSize) * 100.0;
-    double ratio     = (double)originalSize / (compressedSize > 0 ? compressedSize : 1);
-
-    char compressedFile[MAX_FILENAME];
-    strcpy(compressedFile, inputFile);
-    char* ext = strrchr(compressedFile, '.');
-    if (ext) *ext = '\0';
-    
-    const char *inputExt = strrchr(inputFile, '.');
-    if(inputExt && (strcmp(inputExt, ".bmp") == 0 || strcmp(inputExt, ".BMP") == 0)) 
-    {
-        strcat(compressedFile, "_compressed.bmp");
-    } 
-    else if(img->hasAlpha) 
-    {
-        strcat(compressedFile, "_compressed.pam");
-    }
-     else 
-     {
-        strcat(compressedFile, "_compressed.ppm");
-    }
-    
-    saveColorImage(compressedFile, img);
-    
-    printf("\nCompression Results:\n");
-    printf("File compressed successfully: %s\n", compressedFile);
-    printf("Original Size:     %ld bytes\n",   originalSize);
-    printf("Compressed Size:   %ld bytes\n",   compressedSize);
-    printf("Non-zero coeffs:   %ld / %ld (%.1f%% retained)\n",
-           totalNonZero, totalCoeffs,
-           totalCoeffs > 0 ? 100.0 * totalNonZero / totalCoeffs : 0.0);
-    printf("Reduction:         %.2f%%\n",  reduction);
-    printf("Compression Ratio: %.2f:1\n",  ratio);
-    printf("Quality Factor:    %d\n",      quality);
-
-    
-    // DECOMPRESSION
-    printf("=== DECOMPRESSION ===\n");
-    
-    char decompressedFile[MAX_FILENAME];
-    strcpy(decompressedFile, inputFile);
-    ext = strrchr(decompressedFile, '.');
-    if (ext) *ext = '\0';
-    
-    if(inputExt && (strcmp(inputExt, ".bmp") == 0 || strcmp(inputExt, ".BMP") == 0)) {
-        strcat(decompressedFile, "_decompressed.bmp");
-    } else if(img->hasAlpha) {
-        strcat(decompressedFile, "_decompressed.pam");
-    } else {
-        strcat(decompressedFile, "_decompressed.ppm");
-    }
-    
-    saveColorImage(decompressedFile, img);
-    printf("✓ Color image decompressed\n");
-    printf("  Format: %s\n", img->hasAlpha ? "32-bit RGBA" : "24-bit RGB");
-    printf("  Saved to: %s\n\n", decompressedFile);
-    
-    freeColorImage(img);
-}
-
 void processColorFile(const char* fileName, int operation)
 {
     if(operation == 1) {
         // COMPRESSION
         processColorImage(fileName);
-    } 
-    else
-     {
+    } else {
         // DECOMPRESSION
         const char* ext = strrchr(fileName, '.');
         int isCompressed = 0;
