@@ -1597,7 +1597,9 @@ void processTextFile(const char* fileName, int operation)
     if(operation == 1) {
         // COMPRESSION
         compressTextHuffman(fileName);
-    } else {
+    } 
+    else 
+    {
         // DECOMPRESSION
         const char* ext = strrchr(fileName, '.');
         if(!ext || strcmp(ext, ".huff") != 0) {
