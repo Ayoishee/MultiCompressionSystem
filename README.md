@@ -135,7 +135,7 @@ make
 ## Author
 
 **Prottasha Saha Ayoishee**
-B.Sc. in Software Engineering
+BSSE in Software Engineering
 University of Dhaka
 
 ---
