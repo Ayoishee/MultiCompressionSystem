@@ -6,7 +6,7 @@
 #define MAX_TREE_NODES 512
 #define PI             3.14159265358979323846
 
-/* ---- File Type Enum ---- */
+/* ---- File Type ---- */
 typedef enum {
     TEXT_FILE,
     BMP_FILE,

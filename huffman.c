@@ -1,14 +1,8 @@
-/* ============================================================
- * huffman.c  –  Huffman tree construction and code generation
- * ============================================================ */
-
-#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "huffman.h"
 
-/* ---- Node allocation ---- */
 HuffmanNode *createNode(unsigned data, int freq)
 {
     HuffmanNode *node = (HuffmanNode *)malloc(sizeof(HuffmanNode));
@@ -19,7 +13,6 @@ HuffmanNode *createNode(unsigned data, int freq)
     return node;
 }
 
-/* ---- Min-heap helpers ---- */
 static void swapNodes(HuffmanNode **a, HuffmanNode **b)
 {
     HuffmanNode *tmp = *a; *a = *b; *b = tmp;
@@ -70,8 +63,7 @@ void insertMinHeap(MinHeap *heap, HuffmanNode *node)
     }
     heap->nodes[i] = node;
 }
-
-/* ---- Recursive code builder ---- */
+//recursive
 void buildHuffmanCodes(HuffmanNode *root, char *code, int top,
                        HuffmanCode *huffmanCodes, int *index)
 {
@@ -86,7 +78,7 @@ void buildHuffmanCodes(HuffmanNode *root, char *code, int top,
     if (root->right) { code[top] = '1'; buildHuffmanCodes(root->right, code, top + 1, huffmanCodes, index); }
 }
 
-/* ---- Tree construction ---- */
+//tree making
 HuffmanNode *buildHuffmanTree(unsigned char *text, int size,
                                HuffmanCode *codes, int *codeCount)
 {
@@ -104,8 +96,8 @@ HuffmanNode *buildHuffmanTree(unsigned char *text, int size,
         if (freq[i] > 0)
             insertMinHeap(heap, createNode((unsigned char)i, freq[i]));
 
-    /* Single-symbol edge case */
-    if (heap->size == 1) {
+    if (heap->size == 1)
+     {
         HuffmanNode *only   = extractMin(heap);
         HuffmanNode *dummy  = createNode('\0', 0);
         HuffmanNode *parent = createNode('\0', only->freq + dummy->freq);
@@ -114,7 +106,8 @@ HuffmanNode *buildHuffmanTree(unsigned char *text, int size,
         insertMinHeap(heap, parent);
     }
 
-    while (heap->size > 1) {
+    while (heap->size > 1) 
+    {
         HuffmanNode *left  = extractMin(heap);
         HuffmanNode *right = extractMin(heap);
 
@@ -134,7 +127,6 @@ HuffmanNode *buildHuffmanTree(unsigned char *text, int size,
     return root;
 }
 
-/* ---- Cleanup ---- */
 void freeHuffmanTree(HuffmanNode *root)
 {
     if (!root) return;

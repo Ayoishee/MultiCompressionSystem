@@ -2,7 +2,6 @@
  * color_image.c  –  Color image I/O (BMP 24/32-bit, PPM, PAM)
  * ============================================================ */
 
-#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

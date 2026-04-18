@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <string.h>
 #include "types.h"
@@ -6,185 +5,116 @@
 #include "bmp_compress.h"
 #include "dct_compress.h"
 
-static int isValidFilename(const char *filename, int algorithm)
+/* ───────── Utility Functions ───────── */
+
+static void stripNewline(char *s)
 {
-    const char *ext = strrchr(filename, '.');
-    if (!ext) return 0;
-
-    switch (algorithm) {
-        case 1:
-            return (strcmp(ext, ".txt") == 0 ||
-                    strcmp(ext, ".TXT") == 0);
-
-        case 2:
-            return (strcmp(ext, ".bmp") == 0 ||
-                    strcmp(ext, ".BMP") == 0 );
-        case 3:
-            return (strcmp(ext, ".bmp")  == 0 ||
-                    strcmp(ext, ".BMP")  == 0 ||
-                    strcmp(ext, ".ppm")  == 0 ||
-                    strcmp(ext, ".pam")  == 0);
-        default:
-            return 0;
-    }
+    s[strcspn(s, "\n")] = '\0';
 }
 
-int main(void)
+static int isQuit(const char *s)
 {
-    int  algorithm, operation;
+    return (strcmp(s, "q") == 0 || strcmp(s, "quit") == 0);
+}
+
+static int getAlgorithm(const char *s)
+{
+    if (strcmp(s, "1") == 0) return 1;
+    if (strcmp(s, "2") == 0) return 2;
+    if (strcmp(s, "3") == 0) return 3;
+    return -1;
+}
+
+static int validFile(const char *file, int algo)
+{
+    if (algo == 1)
+        return strstr(file, ".txt") || strstr(file, ".TXT");
+
+    if (algo == 2)
+        return strstr(file, ".bmp") || strstr(file, ".BMP");
+
+    if (algo == 3)
+        return strstr(file, ".bmp") || strstr(file, ".ppm") || strstr(file, ".pam");
+
+    return 0;
+}
+
+/* ───────── MAIN PROGRAM ───────── */
+
+int main()
+{
     char input[MAX_FILENAME];
     char filename[MAX_FILENAME];
 
-    printf("\n╔════════════════════════════════════════════════════════╗\n");
-    printf("║  MULTI-FORMAT COMPRESSION & DECOMPRESSION TOOL         ║\n");
-    printf("╚════════════════════════════════════════════════════════╝\n\n");
+    printf("\n╔════════════════════════════════════════════╗\n");
+    printf("║      MULTI-FORMAT COMPRESSION TOOL        ║\n");
+    printf("╚════════════════════════════════════════════╝\n");
 
-    
-    for ( ; ; )                 //outer loop
-    {    
+    while (1)
+    {
+        /* ── Algorithm Menu ── */
+        printf("\n╔════════════════════════════════════╗\n");
+        printf("║        SELECT ALGORITHM            ║\n");
+        printf("╚════════════════════════════════════╝\n");
+        printf("  1. Huffman Coding   (Text)\n");
+        printf("  2. Bit Plane        (BMP)\n");
+        printf("  3. DCT              (Images)\n");
+        printf("  q. Quit\n");
+        printf("\nEnter choice: ");
 
-        printf("╔════════════════════════════════════════════════════════╗\n");
-        printf("║             SELECT COMPRESSION ALGORITHM               ║\n");
-        printf("╚════════════════════════════════════════════════════════╝\n");
+        fgets(input, sizeof(input), stdin);
+        stripNewline(input);
 
-        printf("    1 . Huffman Coding       (for Text files)\n");
-        printf("    2 . Bit Plane Slicing    (for Grayscale BMP images)\n");
-        printf("    3 . DCT                  (for Color images)\n");
-        printf(" Quit . Q 0r q               (exit the program)\n");
-
-        printf("\nEnter your choice (1 / 2 / 3 / quit): ");
-
-        if (fgets(input, sizeof(input), stdin) == NULL) 
-               break;
-
-        input[strcspn(input, "\n")] = '\0';
-
-        /* quit */
-        if (strcmp(input, "quit") == 0 || strcmp(input, "q") == 0) {
-            printf("\n╔════════════════════════════════════════════════════════╗\n");
-            printf("║                    GOODBYE!                            ║\n");
-            printf("╚════════════════════════════════════════════════════════╝\n");
+        if (isQuit(input))
             break;
-        }
 
-       
-        if (sscanf(input, "%d", &algorithm) != 1 ||algorithm < 1 || algorithm > 3) 
+        int algo = getAlgorithm(input);
+        if (algo == -1)
         {
-            printf("\n Invalid choice. Please enter 1, 2, 3 or quit.\n\n");
+            printf("\n[!] Invalid choice. Try again.\n");
             continue;
         }
 
-        for ( ; ; ) {
-            printf("\n╔════════════════════════════════════════════════════════╗\n");
-            printf("║                  ENTER FILENAME                        ║\n");
-            printf("╚════════════════════════════════════════════════════════╝\n");
+        /* ── File Input ── */
+        printf("\n╔════════════════════════════════════╗\n");
+        printf("║          ENTER FILE NAME           ║\n");
+        printf("╚════════════════════════════════════╝\n");
+        printf("  (type q to go back)\n\n");
 
-            switch (algorithm) {
-                case 1: 
-                        printf("  Accepted : .txt \n");       
-                        break;
-                case 2: 
-                        printf("  Accepted : .bmp (8-bit)  |  .bps\n");    
-                        break;
-                case 3:
-                        printf("  Accepted : .bmp (24/32-bit)  |  .ppm  |  .pam\n");
-                        break;
+        printf("Filename: ");
+        fgets(filename, sizeof(filename), stdin);
+        stripNewline(filename);
 
-            }
-            printf("  (type 'quit' to go back to algorithm selection)\n");
-            printf("\nEnter filename: ");
+        if (isQuit(filename))
+            continue;
 
-            if (fgets(filename, sizeof(filename), stdin) == NULL) goto done;
-            filename[strcspn(filename, "\n")] = '\0';
+        if (!validFile(filename, algo))
+        {
+            printf("\n[!] Invalid file type for selected algorithm.\n");
+            continue;
+        }
 
-            if (strcmp(filename, "quit") == 0 || strcmp(filename, "q") == 0) 
-            {
-                printf("\nGoing back to algorithm selection\n\n");
-                break;
-            }
+        /* ── Compress Only ── */
+        printf("\n╔════════════════════════════════════╗\n");
+        printf("║           COMPRESS FILE            ║\n");
+        printf("╚════════════════════════════════════╝\n");
 
-            if (!isValidFilename(filename, algorithm)) 
-            {
-                printf("\n  [!] Incorrect format for algorithm %d.\n", algorithm);
+        printf("File      : %s\n", filename);
+        printf("Operation : Compression\n");
 
-                switch (algorithm) {
-                    case 1:
-                          printf("      Expected: .txt \n");           
-                          break;
-                    case 2: 
-                          printf("      Expected: .bmp (8-bit) \n");     
-                          break;
-                    case 3: 
-                          printf("      Expected: .bmp (24/32-bit) \n");
-                          break;
-                   }
+        if (algo == 1)
+            processTextFile(filename, 1);
+        else if (algo == 2)
+            processBMPFile(filename, 1);
+        else if (algo == 3)
+            processColorFile(filename, 1);
 
-                printf("      Please try again.\n");
-                continue;   
-            }
+        printf("\n✔ Compression Completed Successfully!\n");
+    }
 
-            for ( ; ; ) {
+    printf("\n╔════════════════════════════════════╗\n");
+    printf("║           GOODBYE!                ║\n");
+    printf("╚════════════════════════════════════╝\n");
 
-                printf("\n╔════════════════════════════════════════════════════════╗\n");
-                printf("║              SELECT OPERATION                          ║\n");
-                printf("╚════════════════════════════════════════════════════════╝\n");
-                printf("  1. Compress\n");
-                printf("  2. Decompress\n");
-                printf("  (type 'quit' to go back to filename entry)\n");
-                printf("\nEnter your choice (1 / 2 / quit): ");
-
-                if (fgets(input, sizeof(input), stdin) == NULL) goto done;
-                input[strcspn(input, "\n")] = '\0';
-
-                if (strcmp(input, "quit") == 0 || strcmp(input, "q") == 0) {
-                    printf("\nGoing back to filename entry...\n");
-                    break;
-                }
-
-                if (sscanf(input, "%d", &operation) != 1 ||
-                    operation < 1 || operation > 2) {
-                    printf("\n  [!] Invalid choice. Please enter 1, 2 or quit.\n");
-                    continue;
-                }
-
-                printf("\n╔════════════════════════════════════════════════════════╗\n");
-                printf("║                  PROCESSING FILE                       ║\n");
-                printf("╚════════════════════════════════════════════════════════╝\n");
-                printf("  Algorithm : ");
-                switch (algorithm)
-                 {
-                    case 1:
-                           printf("Huffman Coding\n");           
-                           break;
-                    case 2: 
-                           printf("Bit Plane Slicing\n");    
-                           break;
-                    case 3: 
-                           printf("DCT (Discrete Cosine Transform)\n"); 
-                           break;
-                }
-                
-                printf("  Operation : %s\n", operation == 1 ? "Compression" : "Decompression");
-                printf("  File      : %s\n", filename);
-
-                switch (algorithm) {
-                    case 1: processTextFile(filename,  operation); break;
-                    case 2: processBMPFile(filename,   operation); break;
-                    case 3: processColorFile(filename, operation); break;
-                }
-
-                printf("\n╔════════════════════════════════════════════════════════╗\n");
-                printf("║              PROCESSING COMPLETE                       ║\n");
-                printf("╚════════════════════════════════════════════════════════╝\n\n");
-
-                break; //done – go back to algorithm select 
-
-            } // end operation loop 
-
-        } // end filename loop 
-
-    } // end algorithm loop 
-
-done:
     return 0;
 }
