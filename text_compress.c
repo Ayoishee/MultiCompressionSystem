@@ -56,27 +56,47 @@ static void printResults(const char *title, const char *mode,
     else if (reduction >= 30) { stars = "* * . . ."; verdict = "FAIR"; }
     else                      { stars = "* . . . ."; verdict = "LOW"; }
 
-    printf("\n");
-    printf("----------------------------------------------------------\n");
-    printf("%s\n", title);
-    printf("----------------------------------------------------------\n");
+//     printf("\n");
+//     printf("----------------------------------------------------------\n");
+//     printf("%s\n", title);
+//     printf("----------------------------------------------------------\n");
 
-    printf("Mode         : %s\n", mode);
-    printf("Saved to     : %s\n\n", outFile);
+//     printf("Mode         : %s\n", mode);
+//     printf("Saved to     : %s\n\n", outFile);
 
-    printf("Original     : %ld bytes\n", origSize);
-    printf("Compressed   : %ld bytes\n\n", compSize);
+//     printf("Original     : %ld bytes\n", origSize);
+//     printf("Compressed   : %ld bytes\n\n", compSize);
 
-    printf("Space Saved  : %.2f%%   [%s]\n", reduction, bar);
-    printf("Ratio        : %.2f : 1\n", ratio);
-    printf("Rating       : %s   %s\n\n", verdict, stars);
+//     printf("Space Saved  : %.2f%%   [%s]\n", reduction, bar);
+//     printf("Ratio        : %.2f : 1\n", ratio);
+//     printf("Rating       : %s   %s\n\n", verdict, stars);
+
+//     if (extraLabel && extraValue)
+//         printf("%s : %s\n\n", extraLabel, extraValue);
+
+//     printf("Decompressed : %s\n", decFile);
+
+//     printf("----------------------------------------------------------\n\n");
+// }
+ printf("\n");
+    printf("+------------------------------------------------------------+\n");
+    printf("| %-58s |\n", title);
+    printf("+------------------------------------------------------------+\n");
+    printf("| Output File  : %-43s |\n", outFile);
+    printf("+------------------------------------------------------------+\n");
+    printf("| Original Size: %-43ld |\n", origSize);
+    printf("| Compressed   : %-43ld |\n", compSize);
+    printf("+------------------------------------------------------------+\n");
+    printf("| Space Saved  : %-6.2f%%  [%-10s]                       |\n", reduction, bar);
+    printf("| Ratio        : %-10.2f : 1                              |\n", ratio);
+    printf("| Rating       : %-10s %-5s                        |\n", verdict, stars);
 
     if (extraLabel && extraValue)
-        printf("%s : %s\n\n", extraLabel, extraValue);
+        printf("| %-13s : %-41s  |\n", extraLabel, extraValue);
 
-    printf("Decompressed : %s\n", decFile);
-
-    printf("----------------------------------------------------------\n\n");
+    printf("+------------------------------------------------------------+\n");
+    printf("| Decompressed : %-43s |\n", decFile);
+    printf("+------------------------------------------------------------+\n\n");
 }
 
 static void compressTextHuffman(const char *inputFile)
@@ -113,16 +133,10 @@ static void compressTextHuffman(const char *inputFile)
         free(text);
         return;
     }
-
-    char outFile[MAX_FILENAME];
-    strcpy(outFile, inputFile);
-    char *dot = strrchr(outFile, '.');
-    if (dot) *dot = '\0';
-    strcat(outFile, "_compressed.huff");
-
+    /* --- Encode: build bit-string for the whole file --- */
     char *bitStr = (char *)malloc(fileSize * 256);
-    int bitLen = 0;
-
+    int   bitLen = 0;
+ 
     for (int i = 0; i < (int)fileSize; i++) {
         for (int j = 0; j < codeCount; j++) {
             if (text[i] == codes[j].character) {
@@ -133,6 +147,26 @@ static void compressTextHuffman(const char *inputFile)
             }
         }
     }
+
+    char outFile[MAX_FILENAME];
+    strcpy(outFile, inputFile);
+    char *dot = strrchr(outFile, '.');
+    if (dot) *dot = '\0';
+    strcat(outFile, "_compressed.huff");
+
+    // char *bitStr = (char *)malloc(fileSize * 256);
+    // int bitLen = 0;
+
+    // for (int i = 0; i < (int)fileSize; i++) {
+    //     for (int j = 0; j < codeCount; j++) {
+    //         if (text[i] == codes[j].character) {
+    //             int clen = (int)strlen(codes[j].code);
+    //             memcpy(bitStr + bitLen, codes[j].code, clen);
+    //             bitLen += clen;
+    //             break;
+    //         }
+    //     }
+    // }
 
     fp = fopen(outFile, "wb");
 
@@ -152,135 +186,170 @@ static void compressTextHuffman(const char *inputFile)
     long compBytes = (bitLen / 8) + (bitLen % 8 != 0 ? 1 : 0);
 
     /* inline decompress */
-    fp = fopen(outFile, "rb");
+//     fp = fopen(outFile, "rb");
 
-    int rCount;
-    HuffmanCode rCodes[256];
+//     int rCount;
+//     HuffmanCode rCodes[256];
 
-    fread(&rCount, sizeof(int), 1, fp);
+//     fread(&rCount, sizeof(int), 1, fp);
 
-    for (int i = 0; i < rCount; i++) {
-        int clen;
-        fread(&rCodes[i].character, sizeof(unsigned char), 1, fp);
-        fread(&clen, sizeof(int), 1, fp);
-        fread(rCodes[i].code, sizeof(char), clen, fp);
-        rCodes[i].code[clen] = '\0';
-    }
+//     for (int i = 0; i < rCount; i++) {
+//         int clen;
+//         fread(&rCodes[i].character, sizeof(unsigned char), 1, fp);
+//         fread(&clen, sizeof(int), 1, fp);
+//         fread(rCodes[i].code, sizeof(char), clen, fp);
+//         rCodes[i].code[clen] = '\0';
+//     }
 
-    long origSize;
-    int rBitLen;
+//     long origSize;
+//     int rBitLen;
 
-    fread(&origSize, sizeof(long), 1, fp);
-    fread(&rBitLen, sizeof(int), 1, fp);
+//     fread(&origSize, sizeof(long), 1, fp);
+//     fread(&rBitLen, sizeof(int), 1, fp);
 
-    char *rBits = (char *)malloc(rBitLen + 1);
-    fread(rBits, sizeof(char), rBitLen, fp);
-    rBits[rBitLen] = '\0';
+//     char *rBits = (char *)malloc(rBitLen + 1);
+//     fread(rBits, sizeof(char), rBitLen, fp);
+//     rBits[rBitLen] = '\0';
 
-    fclose(fp);
+//     fclose(fp);
 
-    unsigned char *decoded = (unsigned char *)malloc(origSize + 1);
-    int decLen = decodeBitString(rBits, rBitLen, rCodes, rCount, decoded, origSize);
+//     unsigned char *decoded = (unsigned char *)malloc(origSize + 1);
+//     int decLen = decodeBitString(rBits, rBitLen, rCodes, rCount, decoded, origSize);
 
+//     char decFile[MAX_FILENAME];
+//     strcpy(decFile, inputFile);
+//     dot = strrchr(decFile, '.');
+//     if (dot) *dot = '\0';
+//     strcat(decFile, "_decompressed.txt");
+
+//     fp = fopen(decFile, "wb");
+//     fwrite(decoded, 1, decLen, fp);
+//     fclose(fp);
+
+//     char extra[128];
+//     snprintf(extra, sizeof(extra), "%d unique symbols", codeCount);
+
+//     printResults("COMPRESSION SUMMARY (HUFFMAN CODING)",
+//                  "Lossless Huffman Encoding",
+//                  outFile, decFile,
+//                  fileSize, compBytes,
+//                  "Symbols", extra);
+
+//     free(text);
+//     free(bitStr);
+//     free(rBits);
+//     free(decoded);
+//     freeHuffmanTree(root);
+// }
+/* --- Auto-decompress: decode the bit-string we just created --- */
+    unsigned char *decoded = (unsigned char *)malloc(fileSize + 1);
+    int decLen = decodeBitString(bitStr, bitLen, codes, codeCount,
+                                  decoded, fileSize);
+ 
     char decFile[MAX_FILENAME];
     strcpy(decFile, inputFile);
     dot = strrchr(decFile, '.');
     if (dot) *dot = '\0';
     strcat(decFile, "_decompressed.txt");
-
+ 
     fp = fopen(decFile, "wb");
     fwrite(decoded, 1, decLen, fp);
     fclose(fp);
-
+ 
+    /* --- Print summary --- */
     char extra[128];
     snprintf(extra, sizeof(extra), "%d unique symbols", codeCount);
-
     printResults("COMPRESSION SUMMARY (HUFFMAN CODING)",
                  "Lossless Huffman Encoding",
                  outFile, decFile,
                  fileSize, compBytes,
                  "Symbols", extra);
-
+ 
     free(text);
     free(bitStr);
-    free(rBits);
     free(decoded);
     freeHuffmanTree(root);
 }
 
-static void decompressTextHuffman(const char *inputFile)
-{
-    printf("\n=== TEXT FILE DECOMPRESSION ===\n");
 
-    FILE *fp = fopen(inputFile, "rb");
-    if (!fp) {
-        printf("Error opening compressed file\n");
-        return;
-    }
+// static void decompressTextHuffman(const char *inputFile)
+// {
+//     printf("\n=== TEXT FILE DECOMPRESSION ===\n");
 
-    int codeCount;
-    HuffmanCode codes[256];
+//     FILE *fp = fopen(inputFile, "rb");
+//     if (!fp) {
+//         printf("Error opening compressed file\n");
+//         return;
+//     }
 
-    fread(&codeCount, sizeof(int), 1, fp);
+//     int codeCount;
+//     HuffmanCode codes[256];
 
-    for (int i = 0; i < codeCount; i++) {
-        int clen;
-        fread(&codes[i].character, sizeof(unsigned char), 1, fp);
-        fread(&clen, sizeof(int), 1, fp);
-        fread(codes[i].code, sizeof(char), clen, fp);
-        codes[i].code[clen] = '\0';
-    }
+//     fread(&codeCount, sizeof(int), 1, fp);
 
-    long origSize;
-    int bitLen;
+//     for (int i = 0; i < codeCount; i++) {
+//         int clen;
+//         fread(&codes[i].character, sizeof(unsigned char), 1, fp);
+//         fread(&clen, sizeof(int), 1, fp);
+//         fread(codes[i].code, sizeof(char), clen, fp);
+//         codes[i].code[clen] = '\0';
+//     }
 
-    fread(&origSize, sizeof(long), 1, fp);
-    fread(&bitLen, sizeof(int), 1, fp);
+//     long origSize;
+//     int bitLen;
 
-    char *bits = (char *)malloc(bitLen + 1);
-    fread(bits, sizeof(char), bitLen, fp);
-    bits[bitLen] = '\0';
+//     fread(&origSize, sizeof(long), 1, fp);
+//     fread(&bitLen, sizeof(int), 1, fp);
 
-    fclose(fp);
+//     char *bits = (char *)malloc(bitLen + 1);
+//     fread(bits, sizeof(char), bitLen, fp);
+//     bits[bitLen] = '\0';
 
-    unsigned char *decoded = (unsigned char *)malloc(origSize + 1);
-    int decLen = decodeBitString(bits, bitLen, codes, codeCount, decoded, origSize);
+//     fclose(fp);
 
-    char decFile[MAX_FILENAME];
-    strcpy(decFile, inputFile);
-    char *dot = strrchr(decFile, '.');
-    if (dot) *dot = '\0';
-    strcat(decFile, "_decompressed.txt");
+//     unsigned char *decoded = (unsigned char *)malloc(origSize + 1);
+//     int decLen = decodeBitString(bits, bitLen, codes, codeCount, decoded, origSize);
 
-    fp = fopen(decFile, "wb");
-    fwrite(decoded, 1, decLen, fp);
-    fclose(fp);
+//     char decFile[MAX_FILENAME];
+//     strcpy(decFile, inputFile);
+//     char *dot = strrchr(decFile, '.');
+//     if (dot) *dot = '\0';
+//     strcat(decFile, "_decompressed.txt");
 
-    printf("\n----------------------------------------------------------\n");
-    printf("DECOMPRESSION COMPLETE (HUFFMAN CODING)\n");
-    printf("----------------------------------------------------------\n");
-    printf("Algorithm    : Huffman Coding (Lossless)\n");
-    printf("Output File  : %s\n", decFile);
-    printf("Bytes Restored: %d (expected %ld)\n", decLen, origSize);
-    printf("----------------------------------------------------------\n\n");
+//     fp = fopen(decFile, "wb");
+//     fwrite(decoded, 1, decLen, fp);
+//     fclose(fp);
 
-    free(bits);
-    free(decoded);
-}
+//     printf("\n----------------------------------------------------------\n");
+//     printf("DECOMPRESSION COMPLETE (HUFFMAN CODING)\n");
+//     printf("----------------------------------------------------------\n");
+//     printf("Algorithm    : Huffman Coding (Lossless)\n");
+//     printf("Output File  : %s\n", decFile);
+//     printf("Bytes Restored: %d (expected %ld)\n", decLen, origSize);
+//     printf("----------------------------------------------------------\n\n");
+
+//     free(bits);
+//     free(decoded);
+// }
 
 //public entry
+// void processTextFile(const char *fileName, int operation)
+// {
+//     if (operation == 1) {
+//         compressTextHuffman(fileName);
+//         return;
+//     }
+
+//     const char *ext = strrchr(fileName, '.');
+//     if (!ext || strcmp(ext, ".huff") != 0) {
+//         printf("\nERROR: Not a compressed file!\n");
+//         return;
+//     }
+
+//     decompressTextHuffman(fileName);
+// }
 void processTextFile(const char *fileName, int operation)
 {
-    if (operation == 1) {
-        compressTextHuffman(fileName);
-        return;
-    }
-
-    const char *ext = strrchr(fileName, '.');
-    if (!ext || strcmp(ext, ".huff") != 0) {
-        printf("\nERROR: Not a compressed file!\n");
-        return;
-    }
-
-    decompressTextHuffman(fileName);
+    (void)operation; /* always compress + auto-decompress */
+    compressTextHuffman(fileName);
 }

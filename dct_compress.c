@@ -1,4 +1,3 @@
-//#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,14 +6,9 @@
 #include "color_image.h"
 #include "dct_compress.h"
 
-
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-
-/* ============================================================
- *  DCT math
- * ============================================================ */
 
 static double dctCoeff(int x, int y, int u, int v, int N)
 {
@@ -70,10 +64,6 @@ static void dequantize(double dctBlock[8][8], int quality)
             dctBlock[i][j] *= q;
 }
 
-/* ============================================================
- *  Compression stats
- * ============================================================ */
-
 typedef struct {
     long totalCoeffs;
     long nonZeroCoeffs;
@@ -114,10 +104,6 @@ static DCTStats compressChannel(int **channel, int width, int height,
     return stats;
 }
 
-/* ============================================================
- *  Pretty output (GOOD FORMATTING)
- * ============================================================ */
-
 static void printResults(const char *title,
                          const char *mode,
                          const char *outFile,
@@ -133,37 +119,25 @@ static void printResults(const char *title,
     double ratio = (compSize > 0) ? (double)origSize / compSize : 1.0;
 
     printf("\n");
-    printf("==========================================================\n");
-    printf("  %-56s\n", title);
-    printf("==========================================================\n");
-
-    printf("  %-15s : %s\n", "Mode", mode);
-    printf("  %-15s : %s\n", "Saved to", outFile);
-
-    printf("----------------------------------------------------------\n");
-
-    printf("  %-15s : %ld bytes\n", "Original", origSize);
-    printf("  %-15s : %ld bytes\n", "Compressed", compSize);
-
-    printf("----------------------------------------------------------\n");
-
-    printf("  %-15s : %.2f%%\n", "Space Saved", reduction);
-    printf("  %-15s : %.2f : 1\n", "Ratio", ratio);
+    printf("+------------------------------------------------------------+\n");
+    printf("| %-58s |\n", title);
+    printf("+------------------------------------------------------------+\n");
+   // printf("| Mode         : %-43s |\n", mode);
+    printf("| Output File  : %-43s |\n", outFile);
+    printf("+------------------------------------------------------------+\n");
+    printf("| Original Size: %-43ld |\n", origSize);
+    printf("| Compressed   : %-43ld |\n", compSize);
+    printf("+------------------------------------------------------------+\n");
+    printf("| Space Saved  : %-6.2f%%                              |\n", reduction);
+    printf("| Ratio        : %-10.2f : 1                      |\n", ratio);
 
     if (extraLabel && extraValue)
-        printf("  %-15s : %s\n", extraLabel, extraValue);
+        printf("| %-13s : %-41s |\n", extraLabel, extraValue);
 
-    printf("----------------------------------------------------------\n");
-
-    printf("  %-15s : %s\n", "Decompressed", decFile);
-
-    printf("==========================================================\n");
-    printf("\n");
+    printf("+------------------------------------------------------------+\n");
+    printf("| Decompressed : %-43s |\n", decFile);
+    printf("+------------------------------------------------------------+\n\n");
 }
-
-/* ============================================================
- *  Main processing
- * ============================================================ */
 
 static void compressColorImage(const char *inputFile)
 {
@@ -241,8 +215,10 @@ static void decompressColorImage(const char *fileName)
 
     saveColorImage(decFile, img);
 
-    printf("Output File : %s\n", decFile);
-    printf("Note        : Lossy DCT compression applied\n\n");
+    printf("+------------------------------------------------------------+\n");
+    printf("| Mode         : DCT Decompression (Lossy)                   |\n");
+    printf("| Output File  : %-43s |\n", decFile);
+    printf("+------------------------------------------------------------+\n\n");
 
     freeColorImage(img);
 }

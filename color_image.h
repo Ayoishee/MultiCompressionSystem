@@ -4,7 +4,8 @@
 #include "types.h"
 
 ColorImage *loadColorImage(const char *filename);
-void        saveColorImage(const char *filename, ColorImage *img);
-void        freeColorImage(ColorImage *img);
+
+void saveColorImage(const char *filename, ColorImage *img);
+void freeColorImage(ColorImage *img);
 
 #endif 

@@ -128,11 +128,12 @@ static int openGrayscaleBMP(const char *filename,
     return 1;
 }
 
- //Displays a formatted compression summary including file sizes, compression ratio, percentage saved, and quality rating.
-static void printResultsBox(const char *title, const char *mode,     
-                             const char *outFile, const char *decFile,
-                             long origSize, long compSize)
+static void printResultsBox(const char *title, const char *mode,
+                           const char *outFile, const char *decFile,
+                           long origSize, long compSize)
+
 {
+
     double reduction = 0.0;
     if (origSize > 0 && compSize < origSize) 
     {
@@ -153,29 +154,48 @@ static void printResultsBox(const char *title, const char *mode,
     bar[10] = '\0';
 
     const char *stars, *verdict;
-    if      (reduction >= 85) { stars = "* * * * *"; verdict = "EXCELLENT"; }
-    else if (reduction >= 70) { stars = "* * * * ."; verdict = "GREAT    "; }
-    else if (reduction >= 50) { stars = "* * * . ."; verdict = "GOOD     "; }
-    else if (reduction >= 30) { stars = "* * . . ."; verdict = "FAIR     "; }
-    else                      { stars = "* . . . ."; verdict = "LOW      "; }
+    if(reduction >= 85) 
+     { 
+        stars = "*****";
+        verdict = "EXCELLENT";
+     }
+    else if (reduction >= 70) 
+      {
+         stars = "**** ";
+         verdict = "GREAT"; 
+        }
+    else if (reduction >= 50)
+     {
+         stars = "***  ";
+         verdict = "GOOD";
+         }
+    else if(reduction >= 30)
+     { 
+        stars = "**   ";
+       verdict = "FAIR"; 
+    }
+    else                     
+     { 
+        stars = "*    ";
+        verdict = "LOW";
+     }
 
     printf("\n");
-    printf("----------------------------------------------------------\n");
-    printf("  %s\n", title);
-    printf("----------------------------------------------------------\n");
-    printf("  Mode         : %s\n", mode);
-    printf("  Saved to     : %s\n", outFile);
-    printf("----------------------------------------------------------\n");
-    printf("  Original     : %ld bytes\n", origSize);
-    printf("  Compressed   : %ld bytes\n", compSize);
-    printf("----------------------------------------------------------\n");
-    printf("  Space Saved  : %.2f%%   [%s]\n", reduction, bar);
-    printf("  Ratio        : %.2f : 1\n", ratio);
-    printf("  Rating       : %s   %s\n", verdict, stars);
-    printf("----------------------------------------------------------\n");
-    printf("  Decompressed : %s\n", decFile);
-    printf("----------------------------------------------------------\n");
-    printf("\n");
+    printf("+---------------------------------------------------------------+\n");
+    printf("| %-58s    |\n", title);
+    printf("+---------------------------------------------------------------+\n");
+    //printf("| Mode         : %-43s    |\n", mode);
+    printf("| Output File  : %-43s    |\n", outFile);
+    printf("+---------------------------------------------------------------+\n");
+    printf("| Original Size: %-43ld    |\n", origSize);
+    printf("| Compressed   : %-43ld    |\n", compSize);
+    printf("+---------------------------------------------------------------+\n");
+    printf("| Space Saved  : %-6.2f%%  [%-10s]                          |\n", reduction, bar);
+    printf("| Ratio        : %-10.2f : 1                                 |\n", ratio);
+    printf("| Rating       : %-10s %-5s                               |\n", verdict, stars);
+    printf("+---------------------------------------------------------------+\n");
+    printf("| Decompressed : %-43s    |\n", decFile);
+    printf("+---------------------------------------------------------------+\n\n");
 }
 
 static void compressBMPBitPlaneMSB(const char *inputFile)    // MSB (lossy) compression
@@ -426,125 +446,10 @@ static void compressBMPBitPlaneFull(const char *inputFile)  //full bit compressi
                     outFile, decFile, origSize, compSize);
 
     free(imageData);
-    for (int p = 0; p < 8; p++) free(bitPlanes[p]);
-    free(allPacked); free(reconstructed);
-}
-
-
-// decompression (from .bps file)
-static void decompressBPS(const char *fileName)
-{
-    printf("\n=== BMP DECOMPRESSION ===\n");
-
-    FILE *fp = fopen(fileName, "rb");
-    if (!fp) 
-    { 
-        printf("Error: Cannot open compressed file!\n"); 
-        return;
-     }
-
-    int width, height;
-    fread(&width,  sizeof(int), 1, fp);
-    fread(&height, sizeof(int), 1, fp);
-    fclose(fp);
-
-    /* Determine file size so we can tell MSB vs Full */
-    fp = fopen(fileName, "rb");
-    fseek(fp, 0, SEEK_END);
-    long fileSize = ftell(fp);
-    fclose(fp);
-
-    int imageSize = width * height;
-    int msbSize   = (int)(sizeof(int) * 2) + (imageSize + 7) / 8;
-    int fullSize  = (int)(sizeof(int) * 2) + ((imageSize + 7) / 8) * 8;
-    int isMSB     = (labs(fileSize - msbSize) < labs(fileSize - fullSize));
-
-    char decFile[MAX_FILENAME];
-    strcpy(decFile, fileName);
-    char *dot = strrchr(decFile, '.');
-    if (dot) *dot = '\0';
-    strcat(decFile, "_decompressed.bmp");
-
-    if (isMSB) {
-        printf("Detected: MSB Bit Plane compressed file\n\n");
-
-        int packedSize = (imageSize + 7) / 8;
-        unsigned char *packed        = (unsigned char *)malloc(packedSize);
-        unsigned char *reconstructed = (unsigned char *)calloc(imageSize, 1);
-
-        fp = fopen(fileName, "rb");
-        fread(&width,  sizeof(int), 1, fp);
-        fread(&height, sizeof(int), 1, fp);
-        fread(packed, 1, packedSize, fp);
-        fclose(fp);
-
-       for (int i = 0; i < imageSize; i++)
-        {
-          int byteIndex = i / 8;
-          int bitPosition = 7 - (i % 8);
-          int value = packed[byteIndex];
-
-          int divisor = (int)pow(2, bitPosition);
-          value = value / divisor;
-          int bit = value % 2;
-
-          if (bit == 1)
-             reconstructed[i] = 128;
-          else
-             reconstructed[i] = 0;
-     }
-        writeGrayscaleBMP(decFile, reconstructed, width, height, 1);
-
-        printf("\n");
-        printf("----------------------------------------------------------\n");
-        printf("  DECOMPRESSION COMPLETE  (BIT PLANE - MSB)\n");
-        printf("----------------------------------------------------------\n");
-        printf("  Mode   : MSB Bit Plane (Lossy)\n");
-        printf("  Output : %s\n", decFile);
-        printf("  Note   : Image quality reduced (MSB only)\n");
-        printf("----------------------------------------------------------\n");
-        printf("\n");
-
-        free(packed); free(reconstructed);
-
-    } 
-    else 
-    {
-       // printf("Detected: Full Bit Plane compressed file\n\n");
-        int packedPerPlane = (imageSize + 7) / 8;
-        int totalPacked    = packedPerPlane * 8;
-        unsigned char *packed        = (unsigned char *)malloc(totalPacked);
-        unsigned char *reconstructed = (unsigned char *)calloc(imageSize, 1);
-
-        fp = fopen(fileName, "rb");
-        fread(&width,  sizeof(int), 1, fp);
-        fread(&height, sizeof(int), 1, fp);
-        fread(packed, 1, totalPacked, fp);
-        fclose(fp);
-
-        for (int p = 0; p < 8; p++) {
-            int base = p * packedPerPlane;
-            for (int i = 0; i < imageSize; i++) {
-                int val = (packed[base + i / 8] >> (7 - (i % 8))) & 1;
-                if (val) reconstructed[i] |= (1 << p);
-            }
-        }
-
-        writeGrayscaleBMP(decFile, reconstructed, width, height, 1);
-
-        printf("\n");
-        printf("----------------------------------------------------------\n");
-        printf("  DECOMPRESSION COMPLETE  (BIT PLANE - FULL LOSSLESS)\n");
-        printf("----------------------------------------------------------\n");
-        printf("  Mode   : Full Bit Plane (Lossless)\n");
-        printf("  Output : %s\n", decFile);
-        printf("  Note   : Perfect reconstruction - no data lost\n");
-        printf("----------------------------------------------------------\n");
-        printf("\n");
-
-        free(packed); 
-        free(reconstructed);
-    }
+    for (int p = 0; p < 8; p++) 
+    free(bitPlanes[p]);
+    free(allPacked); 
+    free(reconstructed);
 }
 
 // Public entry point
@@ -559,7 +464,7 @@ void processBMPFile(const char *fileName, int operation)
     printf("  | 1. MSB Bit Plane  (Lossy  - max savings)  |\n");
     printf("  | 2. Full Bit Plane (Lossless - no loss)    |\n");
     printf("  | 3. Both methods   (compare side by side)  |\n");
-     printf(" | 4. Quit                                   |\n");
+    printf("  | 4. Quit                                   |\n");
     printf("  +-------------------------------------------+\n");
     printf("  Enter your choice (1-4): ");
 

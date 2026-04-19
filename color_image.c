@@ -152,9 +152,7 @@ static void save32BitBMP(const char *filename, ColorImage *img)
 }
 
 
-/* ============================================================
- *  PPM / PAM loaders
- * ============================================================ */
+//ppm & pam
 
 static ColorImage *loadPPMImage(const char *filename)
 {
@@ -173,7 +171,6 @@ static ColorImage *loadPPMImage(const char *filename)
 
     img->hasAlpha = (strcmp(magic, "P7") == 0) ? 1 : 0;
 
-    /* Skip comments */
     char c = (char)fgetc(fp);
     while (c == '#' || c == '\n' || c == ' ') {
         if (c == '#') { while (fgetc(fp) != '\n'); }
@@ -256,11 +253,7 @@ static void savePPMOrPAM(const char *filename, ColorImage *img)
     fclose(fp);
 }
 
-
-/* ============================================================
- *  Public API
- * ============================================================ */
-
+//public entry point
 ColorImage *loadColorImage(const char *filename)
 {
     const char *ext = strrchr(filename, '.');
