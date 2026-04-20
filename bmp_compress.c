@@ -15,11 +15,21 @@ static int readGrayscalePixels(FILE *fp, unsigned char *imageData,
     fseek(fp, pixelOffset, SEEK_SET);
 
     for (int i = 0; i < height; i++) {
-        int row = isBottomUp ? (height - 1 - i) : i;
+        int row;
+
+        if (isBottomUp)
+         {
+           row = height - 1 - i;
+         } 
+        else 
+        {
+            row = i;
+        }
 
         size_t got = fread(imageData + row * width, 1, width, fp);
+
         if (got < (size_t)width) {
-           // printf("WARNING: Expected %d bytes, got %zu.\n", width, got);
+            printf("Error reading pixel data\n");
             return 0;
         }
         if (rowPadding > 0)
@@ -46,7 +56,15 @@ static void writeGrayscaleBMP(const char *filename,
                                unsigned char *pixels,
                                int width, int height, int isBottomUp)
 {
-    int rowPadding = (4 - (width % 4)) % 4;
+    //int rowPadding = (4 - (width % 4)) % 4;
+    int rowPadding;
+    int remainder = width % 4;
+    rowPadding = 4 - remainder;
+
+    if (rowPadding == 4) 
+    {
+         rowPadding = 0;
+    }
 
     BMPFileHeader fh;
     BMPInfoHeader ih;
@@ -84,7 +102,16 @@ static void writeGrayscaleBMP(const char *filename,
 
     for (int i = 0; i < height; i++) 
     {
-        int row = isBottomUp ? (height - 1 - i) : i;
+        int row;
+
+        if (isBottomUp)
+         {
+           row = height - 1 - i;
+         }
+        else 
+         {
+          row = i;
+         }
         fwrite(pixels + row * width, 1, width, fp);
         if (rowPadding > 0)
             fwrite(pad, 1, rowPadding, fp);
@@ -138,7 +165,7 @@ static void printResultsBox(const char *title, const char *mode,
     if (origSize > 0 && compSize < origSize) 
     {
        reduction = (1.0 - (double)compSize / origSize) * 100.0;
-     }
+    }
 
      double ratio = 1.0;
      if (compSize > 0)
@@ -147,10 +174,23 @@ static void printResultsBox(const char *title, const char *mode,
       }
 
     int filled = (int)(reduction / 10.0);   //rating'****'
-    if (filled > 10) filled = 10;
-    if (filled <  0) filled = 0;
+    if (filled > 10) 
+        filled = 10;
+    if (filled <  0) 
+        filled = 0;
     char bar[11];
-    for (int i = 0; i < 10; i++) bar[i] = (i < filled) ? '#' : '-';
+
+   for (int i = 0; i < 10; i++)
+    {
+       if (i < filled) {
+           bar[i] = '#';
+        }    
+         else
+          {
+            bar[i] = '-';
+         }
+    }
+
     bar[10] = '\0';
 
     const char *stars, *verdict;
@@ -159,13 +199,13 @@ static void printResultsBox(const char *title, const char *mode,
         stars = "*****";
         verdict = "EXCELLENT";
      }
-    else if (reduction >= 70) 
+    else if(reduction >= 70) 
       {
          stars = "**** ";
          verdict = "GREAT"; 
         }
-    else if (reduction >= 50)
-     {
+    else if(reduction >= 50)
+        {
          stars = "***  ";
          verdict = "GOOD";
          }
@@ -184,7 +224,6 @@ static void printResultsBox(const char *title, const char *mode,
     printf("+---------------------------------------------------------------+\n");
     printf("| %-58s    |\n", title);
     printf("+---------------------------------------------------------------+\n");
-    //printf("| Mode         : %-43s    |\n", mode);
     printf("| Output File  : %-43s    |\n", outFile);
     printf("+---------------------------------------------------------------+\n");
     printf("| Original Size: %-43ld    |\n", origSize);
@@ -277,7 +316,7 @@ static void compressBMPBitPlaneMSB(const char *inputFile)    // MSB (lossy) comp
     fwrite(packed,  1, packedSize, fp);
     fclose(fp);
 
-    /* Step 3: decompress (unpack bits, map 1 -> 128, 0 -> 0) */
+    /* Step 3: decompress*/
     //printf("Step 3: Decompressing...\n");
     unsigned char *unpackedMSB   = (unsigned char *)malloc(imageSize);
     unsigned char *reconstructed = (unsigned char *)calloc(imageSize, 1);
@@ -305,7 +344,8 @@ static void compressBMPBitPlaneMSB(const char *inputFile)    // MSB (lossy) comp
     char decFile[MAX_FILENAME];
     strcpy(decFile, inputFile);
     dot = strrchr(decFile, '.');
-    if (dot) *dot = '\0';
+    if (dot) 
+        *dot = '\0';
     strcat(decFile, "_decompressed.bmp");
 
     writeGrayscaleBMP(decFile, reconstructed, width, height, isBottomUp);
@@ -347,7 +387,16 @@ static void compressBMPBitPlaneFull(const char *inputFile)  //full bit compressi
     unsigned char *imageData = (unsigned char *)malloc(imageSize);
     for (int i = 0; i < height; i++) 
     {
-        int row = isBottomUp ? (height - 1 - i) : i;
+       int row;
+
+       if (isBottomUp) 
+       {
+          row = height - 1 - i;
+       }
+        else
+         {
+           row = i;
+          }
         fread(imageData + row * width, 1, width, fp);
         fseek(fp, rowPadding, SEEK_CUR);
     }
@@ -455,7 +504,6 @@ static void compressBMPBitPlaneFull(const char *inputFile)  //full bit compressi
 // Public entry point
 void processBMPFile(const char *fileName, int operation)
 {
-
     /* Compression */
     int choice;
     printf("\n  +-------------------------------------------+\n");
@@ -468,14 +516,33 @@ void processBMPFile(const char *fileName, int operation)
     printf("  +-------------------------------------------+\n");
     printf("  Enter your choice (1-4): ");
 
-    if (scanf("%d", &choice) != 1) {
-        printf("Invalid input.\n");
-        while (getchar() != '\n');
-        return;
-    }
-    while (getchar() != '\n');  /* flush trailing newline */
+    int result = scanf("%d", &choice);
 
-    switch (choice) {
+    if (result != 1) {
+       printf("Invalid input.\n");
+
+     int ch;
+     while (1) {
+         ch = getchar();
+         if (ch == '\n' || ch == EOF) 
+         {
+            break;
+         }
+       }
+     return;
+   }
+
+    int ch;
+    while (1) {
+    ch = getchar();
+    if (ch == '\n' || ch == EOF)
+     {
+        break;
+     }
+   }
+
+    switch (choice) 
+    {
         case 1:
           compressBMPBitPlaneMSB(fileName);
           break;

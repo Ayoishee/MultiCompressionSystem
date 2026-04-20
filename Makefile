@@ -1,7 +1,3 @@
-# ============================================================
-#  Makefile  –  Multi-Format Compression & Decompression Tool
-# ============================================================
-
 CC      = gcc
 CFLAGS  = -Wall -Wextra -pedantic -std=c11 -O2
 LDFLAGS = -lm
@@ -18,17 +14,17 @@ SRCS    = main.c \
 
 OBJS    = $(SRCS:.c=.o)
 
-# ---- Default target ----------------------------------------
+# ---- Default target ----
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# ---- Pattern rule: compile each .c to .o ------------------
+# ---- Pattern rule: compile each .c to .o ----
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# ---- Explicit header dependencies -------------------------
+# ---- Explicit header dependencies ----
 main.o:          main.c          types.h text_compress.h bmp_compress.h dct_compress.h
 types.o:         types.c         types.h
 huffman.o:       huffman.c       huffman.h types.h
@@ -37,7 +33,7 @@ bmp_compress.o:  bmp_compress.c  bmp_compress.h types.h
 color_image.o:   color_image.c   color_image.h types.h
 dct_compress.o:  dct_compress.c  dct_compress.h color_image.h types.h
 
-# ---- Utility targets ---------------------------------------
+# ---- Utility targets ----
 clean:
 	rm -f $(OBJS) $(TARGET)
 

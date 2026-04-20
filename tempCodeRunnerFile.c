@@ -1,0 +1,1 @@
+gcc main.c types.c huffman.c text_compress.c bmp_compress.c \color_image.c dct_compress.c jpg_to_ppm.c -o compressor -lm

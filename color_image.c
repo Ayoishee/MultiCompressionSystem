@@ -1,7 +1,3 @@
-/* ============================================================
- * color_image.c  –  Color image I/O (BMP 24/32-bit, PPM, PAM)
- * ============================================================ */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,11 +22,7 @@ static void allocChannels(ColorImage *img)
     }
 }
 
-
-/* ============================================================
- *  BMP loaders
- * ============================================================ */
-
+//bmp
 static ColorImage *load32BitBMP(const char *filename)
 {
     FILE *fp = fopen(filename, "rb");
@@ -310,7 +302,9 @@ void freeColorImage(ColorImage *img)
         free(img->R[i]); free(img->G[i]); free(img->B[i]);
         if (img->hasAlpha && img->A) free(img->A[i]);
     }
-    free(img->R); free(img->G); free(img->B);
-    if (img->hasAlpha && img->A) free(img->A);
+    free(img->R); free(img->G); 
+    free(img->B);
+    if (img->hasAlpha && img->A)
+     free(img->A);
     free(img);
 }
