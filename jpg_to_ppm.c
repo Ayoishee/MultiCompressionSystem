@@ -7,10 +7,12 @@ void convertJPGtoPPM(const char *inputFile, char *outputFile)
     strcpy(outputFile, inputFile);
 
     char *dot = strrchr(outputFile, '.');
-    if (dot) *dot = '\0';
+    if (dot)
+       *dot = '\0';
     strcat(outputFile, ".ppm");
 
     char command[1024];
+
     snprintf(command, sizeof(command),
              "convert \"%s\" \"%s\"", inputFile, outputFile);
 
@@ -18,7 +20,7 @@ void convertJPGtoPPM(const char *inputFile, char *outputFile)
     int result = system(command);
 
     if (result != 0) {
-        printf("[ERROR] Conversion failed. Install ImageMagick.\n");
+       // printf("[ERROR] Conversion failed. Install ImageMagick.\n");
         exit(1);
     }
 

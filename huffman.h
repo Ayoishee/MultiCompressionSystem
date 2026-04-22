@@ -26,8 +26,10 @@ void insertMinHeap(MinHeap *heap, HuffmanNode *node);
 
 HuffmanNode *extractMin(MinHeap *heap);
 
-void buildHuffmanCodes(HuffmanNode *root, char *code, int top,
-                               HuffmanCode *huffmanCodes, int *index);
+void buildHuffmanCodes(HuffmanNode *root, 
+                       char *code, int top,
+                       HuffmanCode *huffmanCodes, 
+                       int *index);
 
 HuffmanNode *buildHuffmanTree(unsigned char *text, int size,
                                HuffmanCode *codes, int *codeCount);

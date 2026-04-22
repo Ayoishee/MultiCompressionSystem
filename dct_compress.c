@@ -200,136 +200,178 @@ static DCTStats compressChannel(int **channel, int width, int height,
 
     return stats;
 }
-
 static void printResults(const char *title,
                          const char *mode,
                          const char *outFile,
                          const char *decFile,
                          long origSize,
-                         long compSize,
-                         const char *extraLabel,
-                         const char *extraValue)
+                         long compSize)
 {
-    double reduction = (origSize > 0)
-        ? (1.0 - (double)compSize / origSize) * 100.0 : 0.0;
+    double reduction = 0.0;
 
-    double ratio = (compSize > 0) ? (double)origSize / compSize : 1.0;
+    if (origSize > 0 && compSize < origSize) 
+    {
+        reduction = (1.0 - (double)compSize / origSize) * 100.0;
+    }
 
+     double ratio = 1.0;
+     if (compSize > 0)
+      {
+         ratio = (double)origSize / compSize;
+      }
+
+    int filled = (int)(reduction / 10.0);
+
+    if (filled > 10) 
+    {
+        filled = 10;
+    }
+    if (filled <  0) 
+    {
+        filled = 0;
+    }
+
+    char bar[11];
+    for (int i = 0; i < 10; i++)
+        {
+            if (i < filled) 
+            {
+                bar[i] = '*';
+            } 
+            else
+            {
+                bar[i] = ' ';
+            }
+        }
+    bar[10] = '\0';
+ 
+    const char *stars, *verdict;
+    
+    if(reduction >= 85) 
+     { 
+        stars = "*****";
+        verdict = "EXCELLENT";
+     }
+    else if(reduction >= 70) 
+      {
+         stars = "**** ";
+         verdict = "GREAT"; 
+        }
+    else if(reduction >= 50)
+        {
+         stars = "***  ";
+         verdict = "GOOD";
+         }
+    else if(reduction >= 30)
+     { 
+        stars = "**   ";
+       verdict = "FAIR"; 
+    }
+    else                     
+     { 
+        stars = "*    ";
+        verdict = "LOW";
+     }
+ 
     printf("\n");
-    printf("+------------------------------------------------------------+\n");
-    printf("| %-58s |\n", title);
-    printf("+------------------------------------------------------------+\n");
-    printf("| Output File  : %-43s |\n", outFile);
-    printf("+------------------------------------------------------------+\n");
-    printf("| Original Size: %-43ld |\n", origSize);
-    printf("| Compressed   : %-43ld |\n", compSize);
-    printf("+------------------------------------------------------------+\n");
-    printf("| Space Saved  : %-6.2f%%                                     |\n", reduction);
-    printf("| Ratio        : %-10.2f : 1                              |\n", ratio);
-
-    if (extraLabel && extraValue)
-        printf("| %-13s : %-41s  |\n", extraLabel, extraValue);
-
-    printf("+------------------------------------------------------------+\n");
-    printf("| Decompressed : %-43s |\n", decFile);
-    printf("+------------------------------------------------------------+\n\n");
+    printf("+---------------------------------------------------------------+\n");
+    printf("| %-58s    |\n", title);
+    printf("+---------------------------------------------------------------+\n");
+    printf("| Output File  : %-43s    |\n", outFile);
+    printf("+---------------------------------------------------------------+\n");
+    printf("| Original Size: %-43ld    |\n", origSize);
+    printf("| Compressed   : %-43ld    |\n", compSize);
+    printf("+---------------------------------------------------------------+\n");
+    printf("| Space Saved  : %-6.2f%%  [%-10s]                          |\n", reduction, bar);
+    printf("| Ratio        : %-10.2f : 1                                 |\n", ratio);
+    printf("| Rating       : %-10s %-5s                               |\n", verdict, stars);
+    printf("+---------------------------------------------------------------+\n");
+    printf("| Decompressed : %-43s    |\n", decFile);
+    printf("+---------------------------------------------------------------+\n\n");
 }
-
+ 
 static void compressColorImage(const char *inputFile)
 {
     printf("\nCOLOR IMAGE COMPRESSION (DCT)\n");
-
+ 
     ColorImage *img = loadColorImage(inputFile);
     if (!img) return;
-
+ 
     int quality = 50;
-
+ 
     DCTStats sR = compressChannel(img->R, img->width, img->height, img->maxVal, quality);
     DCTStats sG = compressChannel(img->G, img->width, img->height, img->maxVal, quality);
     DCTStats sB = compressChannel(img->B, img->width, img->height, img->maxVal, quality);
     DCTStats sA = {0, 0};
-
+ 
     if (img->hasAlpha)
         sA = compressChannel(img->A, img->width, img->height, img->maxVal, quality);
-
+ 
     int channels = img->hasAlpha ? 4 : 3;
-
+ 
     long origSize = (long)img->width * img->height * channels;
-
+ 
     long totalNZ = sR.nonZeroCoeffs + sG.nonZeroCoeffs + sB.nonZeroCoeffs + sA.nonZeroCoeffs;
-
+ 
     long compSize = totalNZ * 2;
-
+ 
     char compFile[MAX_FILENAME];
     strcpy(compFile, inputFile);
     char *dot = strrchr(compFile, '.');
     if (dot) *dot = '\0';
     strcat(compFile, "_compressed.bmp");
-
+ 
     saveColorImage(compFile, img);
-
+ 
     char decFile[MAX_FILENAME];
     strcpy(decFile, inputFile);
     dot = strrchr(decFile, '.');
     if (dot) *dot = '\0';
     strcat(decFile, "_decompressed.bmp");
-
+ 
     saveColorImage(decFile, img);
-
-    char extra[64];
-    double retained;
-    double totalCoeffs;
-
-    totalCoeffs = sR.totalCoeffs + sG.totalCoeffs + sB.totalCoeffs + sA.totalCoeffs;      retained = 100.0 * totalNZ;
-    retained = retained / totalCoeffs;
-
-    char percentStr[100];
-    sprintf(percentStr, "%.1f%% coeffs kept (Q=%d)", retained, quality);
-    strcpy(extra, percentStr);
-    
+ 
     printResults("COMPRESSION RESULT",
                  img->hasAlpha ? "RGBA DCT" : "RGB DCT",
                  compFile,
                  decFile,
                  origSize,
-                 compSize,
-                 "Coefficients",
-                 extra);
-
+                 compSize);
+ 
     freeColorImage(img);
 }
-
+ 
 static void decompressColorImage(const char *fileName)
 {
     printf("\nCOLOR IMAGE DECOMPRESSION (DCT)\n");
-
+ 
     ColorImage *img;
     img = loadColorImage(fileName);
       if (img == NULL)
       {
         return;
       }
-
+ 
     char decFile[MAX_FILENAME];
     strcpy(decFile, fileName);
     char *dot;
     dot = strrchr(decFile, '.');
-
+ 
     if (dot!= NULL) 
        *dot = '\0';
-
+ 
     strcat(decFile, "_decompressed.bmp");
-
+ 
     saveColorImage(decFile, img);
-
+ 
     printf("+------------------------------------------------------------+\n");
     printf("| Mode         : DCT Decompression (Lossy)                   |\n");
     printf("| Output File  : %-43s |\n", decFile);
     printf("+------------------------------------------------------------+\n\n");
-
+ 
     freeColorImage(img);
 }
-
+ 
 void processColorFile(const char *fileName, int operation)
 {
     if (operation == 1) {
@@ -338,7 +380,7 @@ void processColorFile(const char *fileName, int operation)
     }
     char *check;
     check = strstr(fileName, "_compressed");
-
+ 
     if (check == NULL)
     {
         printf("ERROR: Not a compressed file. Compress first.\n");

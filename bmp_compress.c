@@ -226,8 +226,10 @@ static void printResultsBox(const char *title, const char *mode,
     printf("+---------------------------------------------------------------+\n");
     printf("| Output File  : %-43s    |\n", outFile);
     printf("+---------------------------------------------------------------+\n");
-    printf("| Original Size: %-43ld    |\n", origSize);
-    printf("| Compressed   : %-43ld    |\n", compSize);
+    // printf("| Original Size: %-35ld  bytes|\n", origSize);
+    // printf("| Compressed   : %-35ld  bytes|\n", compSize);
+    printf("| Original Size: %-5ld bytes                                    |\n", origSize);
+    printf("| Compressed   : %-5ld bytes                                    |\n", compSize);
     printf("+---------------------------------------------------------------+\n");
     printf("| Space Saved  : %-6.2f%%  [%-10s]                          |\n", reduction, bar);
     printf("| Ratio        : %-10.2f : 1                                 |\n", ratio);

@@ -9,12 +9,36 @@
 
 static void stripNewline(char *s)
 {
-    s[strcspn(s, "\n")] = '\0';
+    for (int i = 0; s[i] != '\0'; i++)
+    {
+        if (s[i] == '\n')
+        {
+            s[i] = '\0';
+            break;
+        }
+    }
 }
 
 static int isQuit(const char *s)
 {
-    return (strcmp(s, "q") == 0 || strcmp(s, "quit") == 0);
+    if (strcmp(s, "q") == 0)
+        return 1;
+
+    if (strcmp(s, "quit") == 0)
+        return 1;
+
+    return 0;
+}
+
+int hasExtension(const char *file, const char *ext)
+{
+    int lenFile = strlen(file);
+    int lenExt  = strlen(ext);
+
+    if (lenFile < lenExt) 
+       return 0;
+
+    return strcmp(file + lenFile - lenExt, ext) == 0;
 }
 
 static int getAlgorithm(const char *s)
@@ -33,26 +57,38 @@ static int getAlgorithm(const char *s)
 static int validFile(const char *file, int algo)
 {
     if (algo == 1) 
-          return strstr(file, ".txt")  || strstr(file, ".TXT");
-    if (algo == 2) 
-          return strstr(file, ".bmp")  || strstr(file, ".BMP");
+    {
+        return hasExtension(file, ".txt") || hasExtension(file, ".TXT");
+    }
+
+    if (algo == 2)
+     {
+        return hasExtension(file, ".bmp") || hasExtension(file, ".BMP");
+    }
+
     if (algo == 3)
-    return strstr(file, ".bmp") || strstr(file, ".BMP")
-        || strstr(file, ".ppm") || strstr(file, ".PPM")
-        || strstr(file, ".pam") || strstr(file, ".PAM")
-        || strstr(file, ".jpg") || strstr(file, ".JPG")
-        || strstr(file, ".jpeg")|| strstr(file, ".JPEG");
-        return 0;
+     {
+        return hasExtension(file, ".bmp") ||
+               hasExtension(file, ".BMP") ||
+               hasExtension(file, ".ppm") || 
+               hasExtension(file, ".PPM") ||
+               hasExtension(file, ".jpg") ||
+               hasExtension(file, ".JPG") ||
+               hasExtension(file, ".jpeg")|| 
+               hasExtension(file, ".JPEG");
+    }
+
+    return 0;
 }
 
 static const char *algoName(int algo)
 {
     if (algo == 1) 
-        return "Huffman Coding  (Text)";
+        return "Huffman Coding (Text)";
     if (algo == 2)
-        return  "Bit Plane       (BMP) ";
+        return  "Bit Plane (BMP) ";
     if (algo == 3) 
-         return "DCT             (Image)";
+         return "DCT (Image)";
 
     return "Unknown";
 }
@@ -73,9 +109,9 @@ int main(void)
         printf("\n+------------------------------------+\n");
         printf("|        SELECT ALGORITHM            |\n");
         printf("+------------------------------------+\n");
-        printf("|  1. Huffman Coding   (Text .txt)   |\n");
-        printf("|  2. Bit Plane Slice  (BMP  .bmp)   |\n");
-        printf("|  3. DCT Compression  (Image)       |\n");
+        printf("|  1. Huffman Coding  (.Text .txt)   |\n");
+        printf("|  2. Bit Plane Slice (.BMP  .bmp)   |\n");
+        printf("|  3. DCT Compression (.Image)       |\n");
         printf("|  q. Quit                           |\n");
         printf("+------------------------------------+\n"); 
         
@@ -96,7 +132,7 @@ int main(void)
         printf("\n+--------------------------------------+\n");
         printf("|          ENTER FILE NAME             |\n");
         printf("+--------------------------------------+\n");
-        printf("|  Algorithm : %-20s |\n", algoName(algo));
+        printf("|  Algorithm : %-20s   |\n", algoName(algo));
         printf("|  (type q to go back)                 |\n");
         printf("+--------------------------------------+\n");
         printf("Filename: ");
@@ -141,28 +177,27 @@ int main(void)
         else if (algo == 2) 
                  processBMPFile (filename, 1);
         else if (algo == 3)
-{
-    char ppmFile[MAX_FILENAME];
+        {
+            char ppmFile[MAX_FILENAME];
 
-    if (strstr(filename, ".jpg") || strstr(filename, ".JPG") ||
-        strstr(filename, ".jpeg")|| strstr(filename, ".JPEG"))
-    {
-        convertJPGtoPPM(filename, ppmFile);
-        processColorFile(ppmFile, 1);
-    }
-    else
-    {
-        processColorFile(filename, 1);
-    }
-}
-
-printf("\n Compression + Decompression completed successfully!\n");
+            if (strstr(filename, ".jpg") || strstr(filename, ".JPG") ||
+                strstr(filename, ".jpeg")|| strstr(filename, ".JPEG"))
+            {
+               convertJPGtoPPM(filename, ppmFile);
+               processColorFile(ppmFile, 1);
+             }
+            else
+             {
+                processColorFile(filename, 1);
+             }
+        }
+     printf("\n Compression + Decompression completed successfully!\n");
     }
 
     printf("\n+------------------------------------+\n");
-    printf("|             GOODBYE!              |\n");
+    printf("|             GOODBYE!               |\n");
     printf("+------------------------------------+\n\n");
 
     return 0;
 }
-// gcc main.c types.c huffman.c text_compress.c bmp_compress.c \color_image.c dct_compress.c jpg_to_ppm.c -o compressor -lm
+// gcc main.c types.c huffman.c text_compress.c bmp_compress.c color_image.c dct_compress.c jpg_to_ppm.c -o compressor -lm

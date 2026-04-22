@@ -43,8 +43,9 @@ FileType detectFileType(const char *fileName)
         return BMP_FILE; 
     }
 
-        if(strcmp(ext, ".ppm")  == 0 || strcmp(ext, ".pam")  == 0 ||
-              strcmp(ext, ".jpg")  == 0 || strcmp(ext, ".jpeg") == 0)
+        if(strcmp(ext, ".ppm")  == 0 ||
+           strcmp(ext, ".jpg")  == 0 || 
+           strcmp(ext, ".jpeg") == 0)
 
         return FILE_COLOR;
 
