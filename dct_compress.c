@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+
 #include "types.h"
 #include "color_image.h"
 #include "dct_compress.h"

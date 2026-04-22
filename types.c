@@ -33,21 +33,24 @@ FileType detectFileType(const char *fileName)
             fread(&infoHeader, sizeof(BMPInfoHeader),1,fp);
             fclose(fp);
 
-            if (infoHeader.biBitCount == 8)     
+            if (infoHeader.biBitCount == 8)
+            {     
                       return BMP_FILE;
+            }
 
-            if (infoHeader.biBitCount == 24 || infoHeader.biBitCount == 32)      
-                     return FILE_COLOR;
+            if (infoHeader.biBitCount == 24 ||
+                infoHeader.biBitCount == 32)      
+                return FILE_COLOR;
 
         }
         return BMP_FILE; 
     }
 
-        if(strcmp(ext, ".ppm")  == 0 ||
-           strcmp(ext, ".jpg")  == 0 || 
-           strcmp(ext, ".jpeg") == 0)
+        // if(strcmp(ext, ".ppm")  == 0 ||
+        //    strcmp(ext, ".jpg")  == 0 || 
+        //    strcmp(ext, ".jpeg") == 0)
 
-        return FILE_COLOR;
+        // return FILE_COLOR;
 
     return UNKNOWN_FILE;
 }

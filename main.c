@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <string.h>
-#include "types.h"
-#include "jpg_to_ppm.h"
+#include <ctype.h>
 
+#include "types.h"
 #include "text_compress.h"
 #include "bmp_compress.h"
 #include "dct_compress.h"
@@ -19,12 +19,22 @@ static void stripNewline(char *s)
     }
 }
 
+
 static int isQuit(const char *s)
 {
-    if (strcmp(s, "q") == 0)
+    char temp[10];
+
+    int i;
+    for (i = 0; s[i] && i < 9; i++){
+        temp[i] = tolower(s[i]);
+    }
+
+    temp[i] = '\0';
+
+    if (strcmp(temp, "q") == 0)
         return 1;
 
-    if (strcmp(s, "quit") == 0)
+    if (strcmp(temp, "quit") == 0)
         return 1;
 
     return 0;
@@ -69,13 +79,7 @@ static int validFile(const char *file, int algo)
     if (algo == 3)
      {
         return hasExtension(file, ".bmp") ||
-               hasExtension(file, ".BMP") ||
-               hasExtension(file, ".ppm") || 
-               hasExtension(file, ".PPM") ||
-               hasExtension(file, ".jpg") ||
-               hasExtension(file, ".JPG") ||
-               hasExtension(file, ".jpeg")|| 
-               hasExtension(file, ".JPEG");
+               hasExtension(file, ".BMP");
     }
 
     return 0;
@@ -120,10 +124,12 @@ int main(void)
         fgets(input, sizeof(input), stdin);
         stripNewline(input);
 
-        if (isQuit(input)) break;
+        if (isQuit(input))
+         break;
 
         int algo = getAlgorithm(input);
-        if (algo == -1) {
+        if (algo == -1)
+         {
             printf("\n[!] Invalid choice. Please enter 1, 2, 3 or q.\n");
             continue;
         }
@@ -140,7 +146,10 @@ int main(void)
         fgets(filename, sizeof(filename), stdin);
         stripNewline(filename);
 
-        if (isQuit(filename)) continue;
+        if (isQuit(filename)) 
+        {
+            continue;
+        }
 
         if (!validFile(filename, algo))
          {
@@ -171,27 +180,15 @@ int main(void)
            continue;
         }
 
-        /* Run compression (each module also writes the decompressed output) */
+        /* Run compression*/
         if(algo == 1)
                  processTextFile(filename, 1);
         else if (algo == 2) 
                  processBMPFile (filename, 1);
         else if (algo == 3)
-        {
-            char ppmFile[MAX_FILENAME];
-
-            if (strstr(filename, ".jpg") || strstr(filename, ".JPG") ||
-                strstr(filename, ".jpeg")|| strstr(filename, ".JPEG"))
             {
-               convertJPGtoPPM(filename, ppmFile);
-               processColorFile(ppmFile, 1);
+               processColorFile(filename, 1);
              }
-            else
-             {
-                processColorFile(filename, 1);
-             }
-        }
-     printf("\n Compression + Decompression completed successfully!\n");
     }
 
     printf("\n+------------------------------------+\n");
@@ -200,4 +197,4 @@ int main(void)
 
     return 0;
 }
-// gcc main.c types.c huffman.c text_compress.c bmp_compress.c color_image.c dct_compress.c jpg_to_ppm.c -o compressor -lm
+// gcc main.c types.c huffman.c text_compress.c bmp_compress.c color_image.c dct_compress.c -o compressor -lm
