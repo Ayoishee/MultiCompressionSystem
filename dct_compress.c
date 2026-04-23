@@ -11,6 +11,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+//O((nm)^2)
 static double dctCoeff(int x, int y, int u, int v, int N)
 {
     double cu;
@@ -296,9 +297,10 @@ static void compressColorImage(const char *inputFile)
     printf("\nCOLOR IMAGE COMPRESSION (DCT)\n");
  
     ColorImage *img = loadColorImage(inputFile);
-    if (!img) return;
+    if (!img)
+     return;
  
-    int quality = 50;
+    int quality = 50; //Middle ground (not too lossy, not too heavy)
  
     DCTStats sR = compressChannel(img->R, img->width, img->height, img->maxVal, quality);
     DCTStats sG = compressChannel(img->G, img->width, img->height, img->maxVal, quality);
@@ -372,7 +374,7 @@ static void decompressColorImage(const char *fileName)
  
     freeColorImage(img);
 }
- 
+//Entry Point 
 void processColorFile(const char *fileName, int operation)
 {
     if (operation == 1) {

@@ -433,10 +433,17 @@ static void compressBMPBitPlaneFull(const char *inputFile)  //full bit compressi
           }
         fread(imageData + row * width, 1, width, fp);
         fseek(fp, rowPadding, SEEK_CUR);
-    }
-    fclose(fp);
-
-    /* Step 1: extract all 8 bit-planes */
+   }
+   fclose(fp);
+//     FILE *fp = fopen(inputFile, "rb");
+// unsigned char *imageData = (unsigned char *)malloc(imageSize);
+// if (!readGrayscalePixels(fp, imageData, width, height, isBottomUp, rowPadding, fh.bfOffBits))
+// {
+//     fclose(fp);
+//     free(imageData);
+//     return;
+// }
+//      fclose(fp);    /* Step 1: extract all 8 bit-planes */
      unsigned char *bitPlanes[8];
 
      for (int p = 0; p < 8; p++)
